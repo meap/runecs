@@ -31,8 +31,8 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Runs the command as a new task in the ECS container.",
+	Use:   "runecs command",
+	Short: "Execute a one-off process in an AWS ECS cluster.",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		svc := ecs.Service{}
@@ -50,8 +50,8 @@ var rootCmd = &cobra.Command{
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "Default", "Profile name that defines the ECS service settings.")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "Verbose output")
+	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "Default", "profile name with ECS cluster settings")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
 }
 
 func initConfig() {

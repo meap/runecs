@@ -17,7 +17,7 @@ Profiles:
 
 Authorization in AWS is done using [named profiles](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html).
 
-Launching a one-off process:
+Executing a one-off process:
 
 ```shell
 runecs rake db:migrate
