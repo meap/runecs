@@ -27,10 +27,10 @@ import (
 
 // ECS parameters that are used to run jobs.
 type Service struct {
-	Region  string
-	Profile string
-	Cluster string
-	Service string
+	AwsRegion  string
+	AwsProfile string
+	Cluster    string
+	Service    string
 }
 
 type serviceDef struct {
@@ -45,8 +45,8 @@ type taskDef struct {
 
 func (s *Service) initCfg() (aws.Config, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithDefaultRegion(s.Region),
-		config.WithSharedConfigProfile(s.Profile),
+		config.WithDefaultRegion(s.AwsRegion),
+		config.WithSharedConfigProfile(s.AwsProfile),
 	)
 
 	if err != nil {

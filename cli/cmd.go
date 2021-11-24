@@ -33,14 +33,10 @@ var rootCmd = &cobra.Command{
 	Short: "Runs the command as a new task in the ECS container.",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		service := &ecs.Service{
-			Region:  viper.GetString(fmt.Sprintf("Profiles.%s.AwsRegion", profile)),
-			Profile: viper.GetString(fmt.Sprintf("Profiles.%s.AwsProfile", profile)),
-			Cluster: viper.GetString(fmt.Sprintf("Profiles.%s.Cluster", profile)),
-			Service: viper.GetString(fmt.Sprintf("Profiles.%s.Service", profile)),
-		}
+		svc := ecs.Service{}
+		viper.UnmarshalKey(fmt.Sprintf("Profiles.%s", profile), &svc)
 
-		service.Execute(args)
+		svc.Execute(args)
 	},
 }
 
@@ -64,6 +60,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+
 }
 
 func Execute() {
