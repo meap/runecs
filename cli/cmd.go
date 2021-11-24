@@ -16,8 +16,10 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
 
+	"github.com/go-playground/validator"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"runecs.io/v1/ecs"
@@ -35,6 +37,11 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		svc := ecs.Service{}
 		viper.UnmarshalKey(fmt.Sprintf("Profiles.%s", profile), &svc)
+
+		validate := validator.New()
+		if err := validate.Struct(&svc); err != nil {
+			log.Fatalf("Missing configuration properties %v\n", err)
+		}
 
 		svc.Execute(args)
 	},

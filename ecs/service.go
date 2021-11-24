@@ -27,10 +27,10 @@ import (
 
 // ECS parameters that are used to run jobs.
 type Service struct {
-	AwsRegion  string
-	AwsProfile string
-	Cluster    string
-	Service    string
+	AwsRegion  string `yaml:"application" validate:"required"`
+	AwsProfile string `yaml:"application" validate:"required"`
+	Cluster    string `yaml:"application" validate:"required"`
+	Service    string `yaml:"application" validate:"required"`
 }
 
 type serviceDef struct {
