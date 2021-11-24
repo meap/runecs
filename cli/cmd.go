@@ -55,6 +55,7 @@ func initConfig() {
 	homeDir, _ := os.UserHomeDir()
 
 	viper.AddConfigPath(homeDir)
+	viper.AddConfigPath(".")
 	viper.SetConfigName(".runecs.yml")
 	viper.SetConfigType("yml")
 
