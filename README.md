@@ -4,11 +4,11 @@ RunECS is a tool for running one-off processes in an ECS cluster. The tool was c
 
 ## How to Use
 
-The ECS cluster settings are located in the `~/.runecs.yml` file, which is located in the user's home directory. The default profile is called `Default` and is automatically used unless explicitly specified otherwise.
+The ECS cluster settings are located in the `~/.runecs.yml` file, which is located in the user's home directory. The default profile is called `default` and is automatically used unless explicitly specified otherwise.
 
 ```yaml
 Profiles:
-  Default:
+  default:
     AwsProfile: myprofile
     AwsRegion: eu-west-1
     Cluster: mycluster
@@ -20,14 +20,16 @@ Authorization in AWS is done using [named profiles](https://docs.aws.amazon.com/
 Executing a one-off process:
 
 ```shell
-runecs rake db:migrate
-runecs rake db:migrate --profile Default
+runecs run rake db:migrate
+runecs run rake db:migrate --profile default
 ```
 
 ## Build
 
 ```shell
 git clone git@github.com:meap/runecs.git
+
+cd runecs
 make
 
 ./bin/runecs --help

@@ -16,7 +16,6 @@ package ecs
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -56,11 +55,15 @@ func (s *Service) initCfg() (aws.Config, error) {
 	return cfg, nil
 }
 
-func (s *Service) describeService(client *ecs.Client) serviceDef {
-	resp, _ := client.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
+func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
+	resp, err := client.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
 		Cluster:  &s.Cluster,
 		Services: []string{s.Service},
 	})
+
+	if err != nil {
+		return serviceDef{}, err
+	}
 
 	def := resp.Services[0]
 
@@ -68,7 +71,7 @@ func (s *Service) describeService(client *ecs.Client) serviceDef {
 		Subnets:        def.NetworkConfiguration.AwsvpcConfiguration.Subnets,
 		SecurityGroups: def.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
 		TaskDef:        *def.TaskDefinition,
-	}
+	}, nil
 }
 
 func (s *Service) describeTask(client *ecs.Client, taskArn *string) taskDef {
@@ -86,7 +89,12 @@ func (s *Service) Execute(cmd []string) {
 	}
 
 	svc := ecs.NewFromConfig(cfg)
-	sdef := s.describeService(svc)
+
+	sdef, err := s.describeService(svc)
+	if err != nil {
+		log.Fatalf("An error occurred while loading the service %s in the cluster %s: %v", s.Service, s.Cluster, err)
+	}
+
 	tdef := s.describeTask(svc, &sdef.TaskDef)
 
 	output, err := svc.RunTask(context.TODO(), &ecs.RunTaskInput{
@@ -112,5 +120,5 @@ func (s *Service) Execute(cmd []string) {
 		log.Fatalln(err)
 	}
 
-	fmt.Printf("Task %s executed.", *output.Tasks[0].TaskArn)
+	log.Printf("Task %s executed.", *output.Tasks[0].TaskArn)
 }

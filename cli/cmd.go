@@ -30,8 +30,8 @@ var (
 	verbose bool
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "runecs command",
+var runCmd = &cobra.Command{
+	Use:   "run [cmd]",
 	Short: "Execute a one-off process in an AWS ECS cluster.",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -47,11 +47,16 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var rootCmd = &cobra.Command{}
+
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "Default", "profile name with ECS cluster settings")
+	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "default", "profile name with ECS cluster settings")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
+	rootCmd.AddCommand(runCmd)
 }
 
 func initConfig() {
