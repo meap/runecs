@@ -35,15 +35,17 @@ var runCmd = &cobra.Command{
 	Short: "Execute a one-off process in an AWS ECS cluster.",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		svc := ecs.Service{}
-		viper.UnmarshalKey(fmt.Sprintf("Profiles.%s", profile), &svc)
-
-		validate := validator.New()
-		if err := validate.Struct(&svc); err != nil {
-			log.Fatalf("Missing configuration properties %v\n", err)
-		}
-
+		svc := initService()
 		svc.Execute(args)
+	},
+}
+
+var deregisterCmd = &cobra.Command{
+	Use:   "deregister",
+	Short: "Unregisters all inactive task definitions.",
+	Run: func(cmd *cobra.Command, args []string) {
+		svc := initService()
+		svc.Deregister()
 	},
 }
 
@@ -57,6 +59,19 @@ func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(deregisterCmd)
+}
+
+func initService() *ecs.Service {
+	svc := ecs.Service{}
+	viper.UnmarshalKey(fmt.Sprintf("Profiles.%s", profile), &svc)
+
+	validate := validator.New()
+	if err := validate.Struct(&svc); err != nil {
+		log.Fatalf("Missing configuration properties %v\n", err)
+	}
+
+	return &svc
 }
 
 func initConfig() {

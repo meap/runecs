@@ -17,11 +17,22 @@ Profiles:
 
 Authorization in AWS is done using [named profiles](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html).
 
+### Execute command
+
 Executing a one-off process:
 
 ```shell
 runecs run rake db:migrate
 runecs run rake db:migrate --profile default
+```
+
+### Deregister task definition
+
+Deregisters all task definitions of all available families in the cluster, and keeps only the latest. See [AWS documentation](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html).
+
+```shell
+runecs deregister
+runecs deregister --profile default
 ```
 
 ## Build
