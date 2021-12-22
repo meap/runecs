@@ -12,7 +12,7 @@
 // limitations under the License.
 
 // Package herrors contains common Hugo errors and error related utilities.
-package cli
+package cmd
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ import (
 	"github.com/go-playground/validator"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"runecs.io/v1/ecs"
+	"runecs.io/v1/pkg/ecs"
 )
 
 var (
