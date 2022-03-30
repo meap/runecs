@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -29,6 +30,7 @@ func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
 	}
 
 	def := resp.Services[0]
+	log.Printf("Service '%s' loaded.", *def.ServiceName)
 
 	return serviceDef{
 		Subnets:        def.NetworkConfiguration.AwsvpcConfiguration.Subnets,
@@ -45,7 +47,7 @@ func (s *Service) describeTask(client *ecs.Client, taskArn *string) taskDef {
 	}
 }
 
-func (s *Service) Execute(cmd []string) {
+func (s *Service) Execute(cmd []string, wait bool) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -84,4 +86,29 @@ func (s *Service) Execute(cmd []string) {
 	}
 
 	log.Printf("Task %s executed.", *output.Tasks[0].TaskArn)
+	if wait {
+		for {
+			success := s.wait(svc, *output.Tasks[0].TaskArn)
+			if success {
+				break
+			}
+
+			time.Sleep(6 * time.Second)
+		}
+
+		log.Printf("Task %s finished.", *output.Tasks[0].TaskArn)
+	}
+}
+
+func (s *Service) wait(client *ecs.Client, task string) bool {
+	output, err := client.DescribeTasks(context.TODO(), &ecs.DescribeTasksInput{
+		Cluster: &s.Cluster,
+		Tasks:   []string{task},
+	})
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return *output.Tasks[0].LastStatus == "STOPPED"
 }
