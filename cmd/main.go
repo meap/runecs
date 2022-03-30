@@ -26,8 +26,9 @@ import (
 )
 
 var (
-	profile string
-	verbose bool
+	profile  string
+	verbose  bool
+	execWait bool
 )
 
 var runCmd = &cobra.Command{
@@ -36,7 +37,7 @@ var runCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		svc := initService()
-		svc.Execute(args)
+		svc.Execute(args, execWait)
 	},
 }
 
@@ -57,6 +58,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "default", "profile name with ECS cluster settings")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
+	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
 
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(deregisterCmd)

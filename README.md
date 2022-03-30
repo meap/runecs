@@ -2,6 +2,8 @@
 
 RunECS is a tool for running one-off processes in an ECS cluster. The tool was created as a simple solution for occasional running of processes in the ECS cluster - e.g. various data migrations. Currently only the FARGATE launch type is supported.
 
+The process can be started asynchronously (does not wait for finish) or synchronously with the `-w` parameter (waits for task finish).
+
 ## How to Use
 
 The ECS cluster settings are located in the `~/.runecs.yml` file, which is located in the user's home directory. The default profile is called `default` and is automatically used unless explicitly specified otherwise.
