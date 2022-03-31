@@ -53,13 +53,13 @@ var deregisterCmd = &cobra.Command{
 var rootCmd = &cobra.Command{}
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "default", "profile name with ECS cluster settings")
+	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "profile name with ECS cluster settings")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
+
+	cobra.OnInitialize(initConfig)
 
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(deregisterCmd)
@@ -67,7 +67,7 @@ func init() {
 
 func initService() *ecs.Service {
 	svc := ecs.Service{}
-	viper.UnmarshalKey(fmt.Sprintf("Profiles.%s", profile), &svc)
+	viper.Unmarshal(&svc)
 
 	validate := validator.New()
 	if err := validate.Struct(&svc); err != nil {
@@ -78,11 +78,10 @@ func initService() *ecs.Service {
 }
 
 func initConfig() {
-	homeDir, _ := os.UserHomeDir()
+	viper.AddConfigPath("$HOME/.runecs/profiles")
+	viper.AddConfigPath("./profiles")
 
-	viper.AddConfigPath(homeDir)
-	viper.AddConfigPath(".")
-	viper.SetConfigName(".runecs.yml")
+	viper.SetConfigName(fmt.Sprintf("%s.yml", profile))
 	viper.SetConfigType("yml")
 
 	viper.AutomaticEnv()
@@ -90,7 +89,6 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
-
 }
 
 func Execute() {

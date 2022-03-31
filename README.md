@@ -6,18 +6,18 @@ The process can be started asynchronously (does not wait for finish) or synchron
 
 ## How to Use
 
-The ECS cluster settings are located in the `~/.runecs.yml` file, which is located in the user's home directory. The default profile is called `default` and is automatically used unless explicitly specified otherwise.
+You need to define a profile to specify the target environment in which to run the task.
+
+The profile values can be defined using environment variables or saved in yaml format in the `~/.runecs/profiles` folder under the name the profile will use.
+
+Save the target environment specification to a file `~/.runecs/profiles/myservice.yml`
 
 ```yaml
-Profiles:
-  default:
-    AwsProfile: myprofile
-    AwsRegion: eu-west-1
-    Cluster: mycluster
-    Service: myservice
+AwsProfile: myprofile
+AwsRegion: eu-west-1
+Cluster: mycluster
+Service: myservice
 ```
-
-Authorization in AWS is done using [named profiles](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html).
 
 ### Execute command
 
@@ -25,7 +25,7 @@ Executing a one-off process:
 
 ```shell
 runecs run rake db:migrate
-runecs run rake db:migrate --profile default
+runecs run rake db:migrate --profile myservice
 ```
 
 ### Deregister task definition
@@ -34,7 +34,7 @@ Deregisters all task definitions of all available families in the cluster, and k
 
 ```shell
 runecs deregister
-runecs deregister --profile default
+runecs deregister --profile myservice
 ```
 
 ## Build
