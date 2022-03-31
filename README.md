@@ -19,6 +19,10 @@ Cluster: mycluster
 Service: myservice
 ```
 
+### Profiles vs Environment Variables
+
+The target environment specified by the profile must use the [named profile](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html) for authorization. Environment variables support using variables `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_DEFAULT_REGION`.
+
 ### Execute command
 
 Executing a one-off process:
