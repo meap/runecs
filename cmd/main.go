@@ -78,6 +78,16 @@ func initService() *ecs.Service {
 }
 
 func initConfig() {
+	if profile == "" {
+		viper.AutomaticEnv()
+		viper.BindEnv("AWS_REGION")
+		viper.BindEnv("AWS_PROFILE")
+		viper.BindEnv("CLUSTER")
+		viper.BindEnv("SERVICE")
+
+		return
+	}
+
 	viper.AddConfigPath("$HOME/.runecs/profiles")
 	viper.AddConfigPath("./profiles")
 
