@@ -24,10 +24,10 @@ import (
 
 // ECS parameters that are used to run jobs.
 type Service struct {
-	AwsRegion  string `yaml:"application" validate:"required"`
-	AwsProfile string `yaml:"application" validate:"required"`
-	Cluster    string `yaml:"application" validate:"required"`
-	Service    string `yaml:"application" validate:"required"`
+	AwsRegion  string `mapstructure:"AWS_REGION" validate:"required"`
+	AwsProfile string `mapstructure:"AWS_PROFILE" validate:"required"`
+	Cluster    string `mapstructure:"CLUSTER" validate:"required"`
+	Service    string `mapstructure:"SERVICE" validate:"required"`
 }
 
 func (s *Service) initCfg() (aws.Config, error) {
