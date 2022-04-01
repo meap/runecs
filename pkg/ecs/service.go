@@ -24,20 +24,25 @@ import (
 
 // ECS parameters that are used to run jobs.
 type Service struct {
-	AwsRegion  string `yaml:"application" validate:"required"`
-	AwsProfile string `yaml:"application" validate:"required"`
-	Cluster    string `yaml:"application" validate:"required"`
-	Service    string `yaml:"application" validate:"required"`
+	AwsRegion  string `mapstructure:"AWS_REGION" validate:"required"`
+	AwsProfile string `mapstructure:"AWS_PROFILE"`
+	Cluster    string `mapstructure:"CLUSTER" validate:"required"`
+	Service    string `mapstructure:"SERVICE" validate:"required"`
 }
 
 func (s *Service) initCfg() (aws.Config, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
+	configFunctions := []func(*config.LoadOptions) error{
 		config.WithDefaultRegion(s.AwsRegion),
-		config.WithSharedConfigProfile(s.AwsProfile),
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithMaxAttempts(retry.NewStandard(), 10)
 		}),
-	)
+	}
+
+	if s.AwsProfile != "" {
+		configFunctions = append(configFunctions, config.WithSharedConfigProfile(s.AwsProfile))
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), configFunctions...)
 
 	if err != nil {
 		return aws.Config{}, err
