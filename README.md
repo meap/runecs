@@ -18,6 +18,14 @@ AwsRegion: eu-west-1
 Cluster: mycluster
 Service: myservice
 ```
+or set
+
+```shell
+export AWS_PROFILE=
+export AWS_REGION=
+export CLUSTER=
+export SERVICE=
+```
 
 ### Profiles vs Environment Variables
 
