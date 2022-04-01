@@ -18,10 +18,21 @@ AwsRegion: eu-west-1
 Cluster: mycluster
 Service: myservice
 ```
-or set
+
+or use environment variables with profile 
 
 ```shell
 export AWS_PROFILE=
+export AWS_REGION=
+export CLUSTER=
+export SERVICE=
+```
+
+or without profile
+
+```shell
+export AWS_ACCESS_KEY_ID=
+export AWS_SECRET_ACCESS_KEY=
 export AWS_REGION=
 export CLUSTER=
 export SERVICE=
