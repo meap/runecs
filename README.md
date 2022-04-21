@@ -62,6 +62,12 @@ runecs deregister
 runecs deregister --profile myservice
 ```
 
+### DEPLOY
+
+```shell
+runecs deploy --image nginx:latest --run
+```
+
 # Build
 
 ```shell

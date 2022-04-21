@@ -26,29 +26,9 @@ import (
 )
 
 var (
-	profile  string
-	verbose  bool
-	execWait bool
+	profile string
+	verbose bool
 )
-
-var runCmd = &cobra.Command{
-	Use:   "run [cmd]",
-	Short: "Execute a one-off process in an AWS ECS cluster.",
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		svc := initService()
-		svc.Execute(args, execWait)
-	},
-}
-
-var deregisterCmd = &cobra.Command{
-	Use:   "deregister",
-	Short: "Unregisters all inactive task definitions.",
-	Run: func(cmd *cobra.Command, args []string) {
-		svc := initService()
-		svc.Deregister()
-	},
-}
 
 var rootCmd = &cobra.Command{}
 
@@ -57,12 +37,59 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
-	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
-
 	cobra.OnInitialize(initConfig)
 
+	/////////
+	// RUN //
+	/////////
+
+	var execWait bool
+
+	runCmd := &cobra.Command{
+		Use:   "run [cmd]",
+		Short: "Execute a one-off process in an AWS ECS cluster.",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Execute(args, execWait)
+		},
+	}
+
+	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
 	rootCmd.AddCommand(runCmd)
-	rootCmd.AddCommand(deregisterCmd)
+
+	////////////////
+	// DEREGISTER //
+	////////////////
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "deregister",
+		Short: "Unregisters all inactive task definitions.",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Deregister()
+		},
+	})
+
+	////////////
+	// DEPLOY //
+	////////////
+
+	var dockerImageUri string
+	var runTask bool
+
+	deployCmd := &cobra.Command{
+		Use:   "deploy",
+		Short: "Creates a new version of the task specification and starts a new task.",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Deploy(dockerImageUri, runTask)
+		},
+	}
+
+	deployCmd.PersistentFlags().StringVarP(&dockerImageUri, "image", "i", "", "new docker image uri")
+	deployCmd.PersistentFlags().BoolVarP(&runTask, "run", "r", false, "runs a new task with the updated definition")
+	rootCmd.AddCommand(deployCmd)
 }
 
 func initService() *ecs.Service {
