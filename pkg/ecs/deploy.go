@@ -51,7 +51,7 @@ func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
 	return response.Services[0], nil
 }
 
-func (s *Service) Deploy(dockerImageUri string, run bool) {
+func (s *Service) Deploy(dockerImageUri string) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -72,17 +72,15 @@ func (s *Service) Deploy(dockerImageUri string, run bool) {
 
 	fmt.Printf("New revision of the task %s has been created\n", taskDefinitionArn)
 
-	if run {
-		updateOutput, err := svc.UpdateService(context.TODO(), &ecs.UpdateServiceInput{
-			Cluster:        &s.Cluster,
-			Service:        &s.Service,
-			TaskDefinition: &taskDefinitionArn,
-		})
+	updateOutput, err := svc.UpdateService(context.TODO(), &ecs.UpdateServiceInput{
+		Cluster:        &s.Cluster,
+		Service:        &s.Service,
+		TaskDefinition: &taskDefinitionArn,
+	})
 
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		fmt.Printf("Service %s has been updated.\n", *updateOutput.Service.ServiceArn)
+	if err != nil {
+		log.Fatalln(err)
 	}
+
+	fmt.Printf("Service %s has been updated.\n", *updateOutput.Service.ServiceArn)
 }

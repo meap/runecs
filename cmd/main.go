@@ -35,6 +35,8 @@ var rootCmd = &cobra.Command{}
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "profile name with ECS cluster settings")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
+	rootCmd.PersistentFlags().String("cluster", "", "ECS cluster name")
+	rootCmd.PersistentFlags().String("service", "", "ECS service name")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	cobra.OnInitialize(initConfig)
@@ -47,7 +49,7 @@ func init() {
 
 	runCmd := &cobra.Command{
 		Use:   "run [cmd]",
-		Short: "Execute a one-off process in an AWS ECS cluster.",
+		Short: "Execute a one-off process in an AWS ECS cluster",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
@@ -59,15 +61,15 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 
 	////////////////
-	// DEREGISTER //
+	// PRUNE //
 	////////////////
 
 	rootCmd.AddCommand(&cobra.Command{
-		Use:   "deregister",
-		Short: "Unregisters all inactive task definitions.",
+		Use:   "prune",
+		Short: "Mark task definitions as inactive",
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Deregister()
+			svc.Prune()
 		},
 	})
 
@@ -76,19 +78,17 @@ func init() {
 	////////////
 
 	var dockerImageUri string
-	var runTask bool
 
 	deployCmd := &cobra.Command{
 		Use:   "deploy",
-		Short: "Creates a new version of the task specification and starts a new task.",
+		Short: "Deploy a new version of the task",
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Deploy(dockerImageUri, runTask)
+			svc.Deploy(dockerImageUri)
 		},
 	}
 
-	deployCmd.PersistentFlags().StringVarP(&dockerImageUri, "image", "i", "", "new docker image uri")
-	deployCmd.PersistentFlags().BoolVarP(&runTask, "run", "r", false, "runs a new task with the updated definition")
+	deployCmd.PersistentFlags().StringVarP(&dockerImageUri, "image-uri", "i", "", "new docker image uri")
 	rootCmd.AddCommand(deployCmd)
 }
 
@@ -109,8 +109,9 @@ func initConfig() {
 		viper.AutomaticEnv()
 		viper.BindEnv("AWS_REGION")
 		viper.BindEnv("AWS_PROFILE")
-		viper.BindEnv("CLUSTER")
-		viper.BindEnv("SERVICE")
+
+		viper.BindPFlag("CLUSTER", rootCmd.Flags().Lookup("cluster"))
+		viper.BindPFlag("SERVICE", rootCmd.Flags().Lookup("service"))
 
 		return
 	}

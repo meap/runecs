@@ -47,7 +47,7 @@ func (s *Service) deregisterTaskFamily(family string, svc *ecs.Client) {
 	fmt.Println("All task definitions for family", family, "deregistered.")
 }
 
-func (s *Service) Deregister() {
+func (s *Service) Prune() {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
