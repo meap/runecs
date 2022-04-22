@@ -123,7 +123,7 @@ func (s *Service) wait(client *ecs.Client, task string) bool {
 		log.Fatalln(err)
 	}
 
-	log.Println(*output.Tasks[0].LastStatus, output.Tasks[0].Containers[0].ExitCode)
+	log.Println(*output.Tasks[0].LastStatus, *output.Tasks[0].Containers[0].ExitCode)
 
 	return *output.Tasks[0].LastStatus == "STOPPED"
 }
