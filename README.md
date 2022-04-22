@@ -53,19 +53,22 @@ runecs run rake db:migrate
 runecs run rake db:migrate --profile myservice
 ```
 
-### DEREGISTER
+### PRUNE
 
 Deregisters all task definitions of all available families in the cluster, and keeps only the latest. See [AWS documentation](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html).
 
 ```shell
-runecs deregister
-runecs deregister --profile myservice
+runecs prune
+runecs prune --profile myservice
 ```
 
 ### DEPLOY
 
 ```shell
-runecs deploy --image nginx:latest --run
+runecs --cluster mycluster \
+       --service website \
+       --image-uri nginx:latest \
+       deploy
 ```
 
 # Build

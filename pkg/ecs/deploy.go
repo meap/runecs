@@ -10,11 +10,29 @@ import (
 	"github.com/jinzhu/copier"
 )
 
-func (s *Service) cloneTaskDef(taskDefinitionArn string, dockerImageUri string, svc *ecs.Client) (string, error) {
+func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
+	response, err := svc.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
+		Cluster:  &s.Cluster,
+		Services: []string{s.Service},
+	})
+
+	if err != nil {
+		return types.Service{}, err
+	}
+
+	return response.Services[0], nil
+}
+
+func (s *Service) cloneTaskDef(dockerImageUri string, svc *ecs.Client) (string, error) {
+	service, err := s.loadService(svc)
+	if err != nil {
+		return "", err
+	}
+
 	// Get the last task definition ARN.
 	// Load the latest task definition.
 	response, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
-		TaskDefinition: &taskDefinitionArn,
+		TaskDefinition: service.TaskDefinition,
 	})
 
 	if err != nil {
@@ -38,19 +56,6 @@ func (s *Service) cloneTaskDef(taskDefinitionArn string, dockerImageUri string, 
 	return *output.TaskDefinition.TaskDefinitionArn, nil
 }
 
-func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
-	response, err := svc.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
-		Cluster:  &s.Cluster,
-		Services: []string{s.Service},
-	})
-
-	if err != nil {
-		return types.Service{}, err
-	}
-
-	return response.Services[0], nil
-}
-
 func (s *Service) Deploy(dockerImageUri string) {
 	cfg, err := s.initCfg()
 	if err != nil {
@@ -59,13 +64,8 @@ func (s *Service) Deploy(dockerImageUri string) {
 
 	svc := ecs.NewFromConfig(cfg)
 
-	service, err := s.loadService(svc)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	// Clones the latest version of the task definition and inserts the new Docker URI.
-	taskDefinitionArn, err := s.cloneTaskDef(*service.TaskDefinition, dockerImageUri, svc)
+	taskDefinitionArn, err := s.cloneTaskDef(dockerImageUri, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
