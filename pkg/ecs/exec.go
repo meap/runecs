@@ -47,7 +47,7 @@ func (s *Service) describeTask(client *ecs.Client, taskArn *string) taskDef {
 	}
 }
 
-func (s *Service) Execute(cmd []string, wait bool) {
+func (s *Service) Execute(cmd []string, wait bool, dockerImageUri string) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -62,9 +62,22 @@ func (s *Service) Execute(cmd []string, wait bool) {
 
 	tdef := s.describeTask(svc, &sdef.TaskDef)
 
+	var taskDef string
+
+	if dockerImageUri != "" {
+		taskDef, err = s.cloneTaskDef(dockerImageUri, svc)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("New task definition %s is created", taskDef)
+	} else {
+		taskDef = sdef.TaskDef
+		log.Printf("The task definition %s is used", taskDef)
+	}
+
 	output, err := svc.RunTask(context.TODO(), &ecs.RunTaskInput{
 		Cluster:        &s.Cluster,
-		TaskDefinition: &sdef.TaskDef,
+		TaskDefinition: &taskDef,
 		LaunchType:     "FARGATE",
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
@@ -109,6 +122,8 @@ func (s *Service) wait(client *ecs.Client, task string) bool {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	log.Println(*output.Tasks[0].LastStatus, output.Tasks[0].Containers[0].ExitCode)
 
 	return *output.Tasks[0].LastStatus == "STOPPED"
 }

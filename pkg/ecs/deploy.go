@@ -36,11 +36,11 @@ func (s *Service) cloneTaskDef(dockerImageUri string, svc *ecs.Client) (string, 
 	})
 
 	if err != nil {
-		return "-1", err
+		return "", err
 	}
 
 	if len(response.TaskDefinition.ContainerDefinitions) > 1 {
-		log.Fatalln("Multiple container definitions in a single task are not supported.")
+		return "", fmt.Errorf("multiple container definitions in a single task are not supported")
 	}
 
 	newDef := &ecs.RegisterTaskDefinitionInput{}
@@ -50,7 +50,7 @@ func (s *Service) cloneTaskDef(dockerImageUri string, svc *ecs.Client) (string, 
 
 	output, err := svc.RegisterTaskDefinition(context.TODO(), newDef)
 	if err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
 
 	return *output.TaskDefinition.TaskDefinitionArn, nil

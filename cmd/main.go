@@ -41,6 +41,8 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 
+	var dockerImageUri string
+
 	/////////
 	// RUN //
 	/////////
@@ -53,11 +55,12 @@ func init() {
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Execute(args, execWait)
+			svc.Execute(args, execWait, dockerImageUri)
 		},
 	}
 
 	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
+	runCmd.PersistentFlags().StringVarP(&dockerImageUri, "image-uri", "i", "", "new docker image uri")
 	rootCmd.AddCommand(runCmd)
 
 	////////////////
@@ -76,8 +79,6 @@ func init() {
 	////////////
 	// DEPLOY //
 	////////////
-
-	var dockerImageUri string
 
 	deployCmd := &cobra.Command{
 		Use:   "deploy",
