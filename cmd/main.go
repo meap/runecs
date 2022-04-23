@@ -69,18 +69,20 @@ func init() {
 	////////////////
 
 	var pruneKeepLast int
+	var pruneKeepDays int
 
 	pruneCmd := &cobra.Command{
 		Use:   "prune",
 		Short: "Mark task definitions as inactive",
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Prune(pruneKeepLast, dryRun)
+			svc.Prune(pruneKeepLast, pruneKeepDays, dryRun)
 		},
 	}
 
 	pruneCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry run")
 	pruneCmd.PersistentFlags().IntVarP(&pruneKeepLast, "keep-last", "", 50, "keep last N task definitions")
+	pruneCmd.PersistentFlags().IntVarP(&pruneKeepDays, "keep-days", "", 5, "keep task definitions older than N days")
 	rootCmd.AddCommand(pruneCmd)
 
 	////////////

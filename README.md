@@ -49,11 +49,11 @@ The target environment specified by the profile must use the [named profile](htt
 Executing a one-off process:
 
 ```shell
-runecs rake db:migrate --cluster mycluster \
+runecs run rake db:migrate --cluster mycluster \
   --service myservice \
   --image-uri nginx:latest \
 
-runecs rake db:migrate --cluster mycluster \
+runecs run rake db:migrate --cluster mycluster \
   --service myservice \
   --wait
 ```

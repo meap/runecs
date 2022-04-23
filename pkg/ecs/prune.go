@@ -4,19 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
-func (s *Service) deregisterTaskFamily(family string, keepLast int, dryRun bool, svc *ecs.Client) {
+func (s *Service) deregisterTaskFamily(family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &family,
 		Sort:         types.SortOrderDesc,
 	}
 
+	today := time.Now().UTC()
 	totalCount := 0
 	deleted := 0
+	keep := 0
 
 	for {
 		resp, err := svc.ListTaskDefinitions(context.TODO(), definitionInput)
@@ -27,9 +30,27 @@ func (s *Service) deregisterTaskFamily(family string, keepLast int, dryRun bool,
 		count := len(resp.TaskDefinitionArns)
 		totalCount += count
 
-		for idx, def := range resp.TaskDefinitionArns {
-			if idx <= keepLast {
-				fmt.Println("Task definition", def, "skipped.")
+		for _, def := range resp.TaskDefinitionArns {
+			response, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
+				TaskDefinition: &def,
+			})
+
+			if err != nil {
+				log.Printf("Failed to describe task definition %s. (%v)\n", def, err)
+				continue
+			}
+
+			diffInDays := int(today.Sub(*response.TaskDefinition.RegisteredAt).Hours() / 24)
+
+			// Last X
+			if keep < keepLast {
+				fmt.Println("Task definition", def, "created", diffInDays, "days ago is skipped.")
+				keep++
+				continue
+			}
+
+			if diffInDays < keepDays {
+				fmt.Println("Task definition", def, "created", diffInDays, "days ago is skipped.")
 				continue
 			}
 
@@ -59,7 +80,7 @@ func (s *Service) deregisterTaskFamily(family string, keepLast int, dryRun bool,
 	fmt.Printf("Total of %d task definitions. Deleted %d definitions.", totalCount, deleted)
 }
 
-func (s *Service) Prune(keepLast int, dryRun bool) {
+func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -88,6 +109,6 @@ func (s *Service) Prune(keepLast int, dryRun bool) {
 	}
 
 	for _, family := range resp.Families {
-		s.deregisterTaskFamily(family, keepLast, dryRun, svc)
+		s.deregisterTaskFamily(family, keepLast, keepDays, dryRun, svc)
 	}
 }
