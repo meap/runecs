@@ -48,7 +48,7 @@ func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *
 	headerFmt := color.New(color.FgBlue, color.Underline).SprintfFunc()
 	columnFmt := color.New(color.FgYellow).SprintfFunc()
 
-	tbl := table.New("Created At", "Revision", "Docker URI")
+	tbl := table.New("Revision", "Created At", "Docker URI")
 	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
 
 	total := 0
@@ -74,7 +74,7 @@ func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *
 				continue
 			}
 
-			tbl.AddRow(resp.TaskDefinition.RegisteredAt, resp.TaskDefinition.Revision, *resp.TaskDefinition.ContainerDefinitions[0].Image)
+			tbl.AddRow(resp.TaskDefinition.Revision, resp.TaskDefinition.RegisteredAt, *resp.TaskDefinition.ContainerDefinitions[0].Image)
 			total++
 		}
 
