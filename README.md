@@ -49,11 +49,11 @@ The target environment specified by the profile must use the [named profile](htt
 Executing a one-off process:
 
 ```shell
-go run . run rake db:migrate --cluster mycluster \
+runecs rake db:migrate --cluster mycluster \
   --service myservice \
   --image-uri nginx:latest \
 
-go run . run rake db:migrate --cluster mycluster \
+runecs rake db:migrate --cluster mycluster \
   --service myservice \
   --wait
 ```
@@ -63,8 +63,8 @@ go run . run rake db:migrate --cluster mycluster \
 Deregisters all task definitions of all available families in the cluster, and keeps only the latest. See [AWS documentation](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html).
 
 ```shell
-runecs prune
-runecs prune --profile myservice
+runecs prune --cluster mycluster --service myservice \
+  --keep-last 10
 ```
 
 ### DEPLOY
