@@ -20,6 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
 // ECS parameters that are used to run jobs.
@@ -28,6 +30,19 @@ type Service struct {
 	AwsProfile string `mapstructure:"AWS_PROFILE"`
 	Cluster    string `mapstructure:"CLUSTER" validate:"required"`
 	Service    string `mapstructure:"SERVICE" validate:"required"`
+}
+
+func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
+	response, err := svc.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
+		Cluster:  &s.Cluster,
+		Services: []string{s.Service},
+	})
+
+	if err != nil {
+		return types.Service{}, err
+	}
+
+	return response.Services[0], nil
 }
 
 func (s *Service) initCfg() (aws.Config, error) {

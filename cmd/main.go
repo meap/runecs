@@ -42,6 +42,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	var dockerImageUri string
+	var dryRun bool
 
 	/////////
 	// RUN //
@@ -67,14 +68,20 @@ func init() {
 	// PRUNE //
 	////////////////
 
-	rootCmd.AddCommand(&cobra.Command{
+	var pruneKeepLast int
+
+	pruneCmd := &cobra.Command{
 		Use:   "prune",
 		Short: "Mark task definitions as inactive",
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Prune()
+			svc.Prune(pruneKeepLast, dryRun)
 		},
-	})
+	}
+
+	pruneCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry run")
+	pruneCmd.PersistentFlags().IntVarP(&pruneKeepLast, "keep-last", "", 50, "keep last N task definitions")
+	rootCmd.AddCommand(pruneCmd)
 
 	////////////
 	// DEPLOY //

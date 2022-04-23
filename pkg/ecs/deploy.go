@@ -6,22 +6,8 @@ import (
 	"log"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/jinzhu/copier"
 )
-
-func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
-	response, err := svc.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
-		Cluster:  &s.Cluster,
-		Services: []string{s.Service},
-	})
-
-	if err != nil {
-		return types.Service{}, err
-	}
-
-	return response.Services[0], nil
-}
 
 func (s *Service) cloneTaskDef(dockerImageUri string, svc *ecs.Client) (string, error) {
 	service, err := s.loadService(svc)
