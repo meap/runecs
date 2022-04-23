@@ -76,6 +76,14 @@ runecs --cluster mycluster \
        deploy
 ```
 
+### REVISIONS
+
+```shell
+runecs revisions --cluster mycluster \
+  --service myservice \
+  --last 10
+```
+
 # Build
 
 ```shell

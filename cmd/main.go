@@ -105,15 +105,18 @@ func init() {
 	// REVISIONS //
 	///////////////
 
+	var lastRevisionNr int
+
 	revisionsCmd := &cobra.Command{
 		Use:   "revisions",
 		Short: "List of available revisions of the task definition.",
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Revisions()
+			svc.Revisions(lastRevisionNr)
 		},
 	}
 
+	revisionsCmd.PersistentFlags().IntVarP(&lastRevisionNr, "last", "", 0, "last N revisions")
 	rootCmd.AddCommand(revisionsCmd)
 }
 

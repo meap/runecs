@@ -7,8 +7,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.10.2
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.12.1
 	github.com/go-playground/validator v9.31.0+incompatible
+	github.com/rodaine/table v1.0.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
+)
+
+require (
+	github.com/mattn/go-colorable v0.1.9 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 )
 
 require (
@@ -21,6 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.6.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.10.1 // indirect
 	github.com/aws/smithy-go v1.9.0 // indirect
+	github.com/fatih/color v1.13.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect

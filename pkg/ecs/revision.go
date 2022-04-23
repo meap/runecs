@@ -2,11 +2,12 @@ package ecs
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/fatih/color"
+	"github.com/rodaine/table"
 )
 
 func (s *Service) getFamilies(familyPrefix string, svc *ecs.Client) ([]string, error) {
@@ -38,11 +39,19 @@ func (s *Service) getFamilyPrefix(svc *ecs.Client) (string, error) {
 	return *response.TaskDefinition.Family, nil
 }
 
-func (s *Service) printRevisions(familyPrefix string, svc *ecs.Client) {
+func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *ecs.Client) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &familyPrefix,
 		Sort:         types.SortOrderDesc,
 	}
+
+	headerFmt := color.New(color.FgBlue, color.Underline).SprintfFunc()
+	columnFmt := color.New(color.FgYellow).SprintfFunc()
+
+	tbl := table.New("Created At", "Revision", "Docker URI")
+	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
+
+	total := 0
 
 	for {
 		response, err := svc.ListTaskDefinitions(context.TODO(), definitionInput)
@@ -52,6 +61,10 @@ func (s *Service) printRevisions(familyPrefix string, svc *ecs.Client) {
 		}
 
 		for _, def := range response.TaskDefinitionArns {
+			if lastRevisionsNr != 0 && lastRevisionsNr < (total+1) {
+				break
+			}
+
 			resp, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
 				TaskDefinition: &def,
 			})
@@ -61,7 +74,8 @@ func (s *Service) printRevisions(familyPrefix string, svc *ecs.Client) {
 				continue
 			}
 
-			fmt.Println(resp.TaskDefinition.RegisteredAt, *resp.TaskDefinition.ContainerDefinitions[0].Image)
+			tbl.AddRow(resp.TaskDefinition.RegisteredAt, resp.TaskDefinition.Revision, *resp.TaskDefinition.ContainerDefinitions[0].Image)
+			total++
 		}
 
 		if response.NextToken == nil {
@@ -70,9 +84,11 @@ func (s *Service) printRevisions(familyPrefix string, svc *ecs.Client) {
 
 		definitionInput.NextToken = response.NextToken
 	}
+
+	tbl.Print()
 }
 
-func (s *Service) Revisions() {
+func (s *Service) Revisions(lastRevisionNr int) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -91,6 +107,6 @@ func (s *Service) Revisions() {
 	}
 
 	for _, family := range response {
-		s.printRevisions(family, svc)
+		s.printRevisions(family, lastRevisionNr, svc)
 	}
 }
