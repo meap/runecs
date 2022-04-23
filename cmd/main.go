@@ -41,7 +41,7 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 
-	var dockerImageUri string
+	var dockerImageTag string
 	var dryRun bool
 
 	/////////
@@ -56,12 +56,12 @@ func init() {
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Execute(args, execWait, dockerImageUri)
+			svc.Execute(args, execWait, dockerImageTag)
 		},
 	}
 
 	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
-	runCmd.PersistentFlags().StringVarP(&dockerImageUri, "image-uri", "i", "", "new docker image uri")
+	runCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
 	rootCmd.AddCommand(runCmd)
 
 	////////////////
@@ -94,11 +94,11 @@ func init() {
 		Short: "Deploy a new version of the task",
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
-			svc.Deploy(dockerImageUri)
+			svc.Deploy(dockerImageTag)
 		},
 	}
 
-	deployCmd.PersistentFlags().StringVarP(&dockerImageUri, "image-uri", "i", "", "new docker image uri")
+	deployCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-uri", "i", "", "new docker image uri")
 	rootCmd.AddCommand(deployCmd)
 
 	///////////////

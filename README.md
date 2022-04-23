@@ -51,7 +51,7 @@ Executing a one-off process:
 ```shell
 runecs run rake db:migrate --cluster mycluster \
   --service myservice \
-  --image-uri nginx:latest \
+  --image-tag latest \
 
 runecs run rake db:migrate --cluster mycluster \
   --service myservice \
@@ -72,7 +72,7 @@ runecs prune --cluster mycluster --service myservice \
 ```shell
 runecs --cluster mycluster \
        --service website \
-       --image-uri nginx:latest \
+       --image-tag latest \
        deploy
 ```
 

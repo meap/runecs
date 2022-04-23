@@ -47,7 +47,7 @@ func (s *Service) describeTask(client *ecs.Client, taskArn *string) taskDef {
 	}
 }
 
-func (s *Service) Execute(cmd []string, wait bool, dockerImageUri string) {
+func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -64,8 +64,8 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageUri string) {
 
 	var taskDef string
 
-	if dockerImageUri != "" {
-		taskDef, err = s.cloneTaskDef(dockerImageUri, svc)
+	if dockerImageTag != "" {
+		taskDef, err = s.cloneTaskDef(dockerImageTag, svc)
 		if err != nil {
 			log.Fatalln(err)
 		}
