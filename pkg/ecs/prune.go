@@ -88,27 +88,17 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) {
 
 	svc := ecs.NewFromConfig(cfg)
 
-	service, err := s.loadService(svc)
+	familyPrefix, err := s.getFamilyPrefix(svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	taskDefResponse, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
-		TaskDefinition: service.TaskDefinition,
-	})
-
+	response, err := s.getFamilies(familyPrefix, svc)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln(err)
 	}
 
-	resp, err := svc.ListTaskDefinitionFamilies(context.TODO(), &ecs.ListTaskDefinitionFamiliesInput{
-		FamilyPrefix: taskDefResponse.TaskDefinition.Family,
-	})
-	if err != nil {
-		log.Fatalf("Listing task definition families failed. (%v)\n", err)
-	}
-
-	for _, family := range resp.Families {
+	for _, family := range response {
 		s.deregisterTaskFamily(family, keepLast, keepDays, dryRun, svc)
 	}
 }

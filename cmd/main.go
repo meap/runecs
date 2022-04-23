@@ -100,6 +100,21 @@ func init() {
 
 	deployCmd.PersistentFlags().StringVarP(&dockerImageUri, "image-uri", "i", "", "new docker image uri")
 	rootCmd.AddCommand(deployCmd)
+
+	///////////////
+	// REVISIONS //
+	///////////////
+
+	revisionsCmd := &cobra.Command{
+		Use:   "revisions",
+		Short: "List of available revisions of the task definition.",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Revisions()
+		},
+	}
+
+	rootCmd.AddCommand(revisionsCmd)
 }
 
 func initService() *ecs.Service {
