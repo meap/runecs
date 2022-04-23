@@ -82,7 +82,7 @@ func init() {
 
 	pruneCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry run")
 	pruneCmd.PersistentFlags().IntVarP(&pruneKeepLast, "keep-last", "", 50, "keep last N task definitions")
-	pruneCmd.PersistentFlags().IntVarP(&pruneKeepDays, "keep-days", "", 5, "keep task definitions older than N days")
+	pruneCmd.PersistentFlags().IntVarP(&pruneKeepDays, "keep-days", "", 0, "keep task definitions older than N days")
 	rootCmd.AddCommand(pruneCmd)
 
 	////////////

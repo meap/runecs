@@ -54,7 +54,7 @@ func (s *Service) deregisterTaskFamily(family string, keepLast int, keepDays int
 				continue
 			}
 
-			deleted += 1
+			deleted++
 
 			if !dryRun {
 				_, err := svc.DeregisterTaskDefinition(context.TODO(), &ecs.DeregisterTaskDefinitionInput{TaskDefinition: &def})
