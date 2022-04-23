@@ -128,7 +128,7 @@ func (s *Service) wait(client *ecs.Client, task string) (bool, error) {
 		return false, err
 	}
 
-	if output.Tasks[0].StopCode == types.TaskStopCodeTaskFailedToStart || output.Tasks[0].StopCode == types.TaskStopCodeEssentialContainerExited {
+	if output.Tasks[0].StopCode == types.TaskStopCodeTaskFailedToStart {
 		return false, fmt.Errorf("task %s failed", *output.Tasks[0].TaskArn)
 	}
 
