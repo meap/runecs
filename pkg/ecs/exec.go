@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -98,10 +99,14 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageUri string) {
 		log.Fatalln(err)
 	}
 
-	log.Printf("Task %s executed.", *output.Tasks[0].TaskArn)
+	log.Printf("task %s executed", *output.Tasks[0].TaskArn)
 	if wait {
 		for {
-			success := s.wait(svc, *output.Tasks[0].TaskArn)
+			success, err := s.wait(svc, *output.Tasks[0].TaskArn)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			if success {
 				break
 			}
@@ -109,21 +114,23 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageUri string) {
 			time.Sleep(6 * time.Second)
 		}
 
-		log.Printf("Task %s finished.", *output.Tasks[0].TaskArn)
+		log.Printf("task %s finished", *output.Tasks[0].TaskArn)
 	}
 }
 
-func (s *Service) wait(client *ecs.Client, task string) bool {
+func (s *Service) wait(client *ecs.Client, task string) (bool, error) {
 	output, err := client.DescribeTasks(context.TODO(), &ecs.DescribeTasksInput{
 		Cluster: &s.Cluster,
 		Tasks:   []string{task},
 	})
 
 	if err != nil {
-		log.Fatalln(err)
+		return false, err
 	}
 
-	log.Println(*output.Tasks[0].LastStatus, *output.Tasks[0].Containers[0].ExitCode)
+	if output.Tasks[0].StopCode == types.TaskStopCodeTaskFailedToStart || output.Tasks[0].StopCode == types.TaskStopCodeEssentialContainerExited {
+		return false, fmt.Errorf("task %s failed", *output.Tasks[0].TaskArn)
+	}
 
-	return *output.Tasks[0].LastStatus == "STOPPED"
+	return *output.Tasks[0].LastStatus == "STOPPED", nil
 }
