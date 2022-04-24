@@ -47,7 +47,7 @@ func (s *Service) describeTask(client *ecs.Client, taskArn *string) taskDef {
 	}
 }
 
-func (s *Service) Execute(cmd []string, wait bool) {
+func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
@@ -62,9 +62,22 @@ func (s *Service) Execute(cmd []string, wait bool) {
 
 	tdef := s.describeTask(svc, &sdef.TaskDef)
 
+	var taskDef string
+
+	if dockerImageTag != "" {
+		taskDef, err = s.cloneTaskDef(dockerImageTag, svc)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Printf("New task definition %s is created", taskDef)
+	} else {
+		taskDef = sdef.TaskDef
+		log.Printf("The task definition %s is used", taskDef)
+	}
+
 	output, err := svc.RunTask(context.TODO(), &ecs.RunTaskInput{
 		Cluster:        &s.Cluster,
-		TaskDefinition: &sdef.TaskDef,
+		TaskDefinition: &taskDef,
 		LaunchType:     "FARGATE",
 		NetworkConfiguration: &types.NetworkConfiguration{
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
@@ -85,10 +98,14 @@ func (s *Service) Execute(cmd []string, wait bool) {
 		log.Fatalln(err)
 	}
 
-	log.Printf("Task %s executed.", *output.Tasks[0].TaskArn)
+	log.Printf("task %s executed", *output.Tasks[0].TaskArn)
 	if wait {
 		for {
-			success := s.wait(svc, *output.Tasks[0].TaskArn)
+			success, err := s.wait(svc, *output.Tasks[0].TaskArn)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			if success {
 				break
 			}
@@ -96,19 +113,25 @@ func (s *Service) Execute(cmd []string, wait bool) {
 			time.Sleep(6 * time.Second)
 		}
 
-		log.Printf("Task %s finished.", *output.Tasks[0].TaskArn)
+		log.Printf("task %s finished", *output.Tasks[0].TaskArn)
 	}
 }
 
-func (s *Service) wait(client *ecs.Client, task string) bool {
+func (s *Service) wait(client *ecs.Client, task string) (bool, error) {
 	output, err := client.DescribeTasks(context.TODO(), &ecs.DescribeTasksInput{
 		Cluster: &s.Cluster,
 		Tasks:   []string{task},
 	})
 
 	if err != nil {
-		log.Fatalln(err)
+		return false, err
 	}
 
-	return *output.Tasks[0].LastStatus == "STOPPED"
+	// if output.Tasks[0].Containers[0].ExitCode != 0 {
+	// 	return false, fmt.Errorf("task %s failed", output.Tasks[0].TaskArn)
+	// }
+
+	// log.Printf("task %s status: %d", *output.Tasks[0].TaskArn, output.Tasks[0].Containers[0].ExitCode)
+
+	return *output.Tasks[0].LastStatus == "STOPPED", nil
 }

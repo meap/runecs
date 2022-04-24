@@ -26,43 +26,98 @@ import (
 )
 
 var (
-	profile  string
-	verbose  bool
-	execWait bool
+	profile string
+	verbose bool
 )
-
-var runCmd = &cobra.Command{
-	Use:   "run [cmd]",
-	Short: "Execute a one-off process in an AWS ECS cluster.",
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		svc := initService()
-		svc.Execute(args, execWait)
-	},
-}
-
-var deregisterCmd = &cobra.Command{
-	Use:   "deregister",
-	Short: "Unregisters all inactive task definitions.",
-	Run: func(cmd *cobra.Command, args []string) {
-		svc := initService()
-		svc.Deregister()
-	},
-}
 
 var rootCmd = &cobra.Command{}
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "profile name with ECS cluster settings")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
+	rootCmd.PersistentFlags().String("cluster", "", "ECS cluster name")
+	rootCmd.PersistentFlags().String("service", "", "ECS service name")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-
-	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
 
 	cobra.OnInitialize(initConfig)
 
+	var dockerImageTag string
+	var dryRun bool
+
+	/////////
+	// RUN //
+	/////////
+
+	var execWait bool
+
+	runCmd := &cobra.Command{
+		Use:   "run [cmd]",
+		Short: "Execute a one-off process in an AWS ECS cluster",
+		Args:  cobra.MinimumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Execute(args, execWait, dockerImageTag)
+		},
+	}
+
+	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
+	runCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
 	rootCmd.AddCommand(runCmd)
-	rootCmd.AddCommand(deregisterCmd)
+
+	////////////////
+	// PRUNE //
+	////////////////
+
+	var pruneKeepLast int
+	var pruneKeepDays int
+
+	pruneCmd := &cobra.Command{
+		Use:   "prune",
+		Short: "Mark task definitions as inactive",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Prune(pruneKeepLast, pruneKeepDays, dryRun)
+		},
+	}
+
+	pruneCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry run")
+	pruneCmd.PersistentFlags().IntVarP(&pruneKeepLast, "keep-last", "", 50, "keep last N task definitions")
+	pruneCmd.PersistentFlags().IntVarP(&pruneKeepDays, "keep-days", "", 0, "keep task definitions older than N days")
+	rootCmd.AddCommand(pruneCmd)
+
+	////////////
+	// DEPLOY //
+	////////////
+
+	deployCmd := &cobra.Command{
+		Use:   "deploy",
+		Short: "Deploy a new version of the task",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Deploy(dockerImageTag)
+		},
+	}
+
+	deployCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-uri", "i", "", "new docker image uri")
+	rootCmd.AddCommand(deployCmd)
+
+	///////////////
+	// REVISIONS //
+	///////////////
+
+	var lastRevisionNr int
+
+	revisionsCmd := &cobra.Command{
+		Use:   "revisions",
+		Short: "List of available revisions of the task definition.",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.Revisions(lastRevisionNr)
+		},
+	}
+
+	revisionsCmd.PersistentFlags().IntVarP(&lastRevisionNr, "last", "", 0, "last N revisions")
+	rootCmd.AddCommand(revisionsCmd)
 }
 
 func initService() *ecs.Service {
@@ -82,8 +137,9 @@ func initConfig() {
 		viper.AutomaticEnv()
 		viper.BindEnv("AWS_REGION")
 		viper.BindEnv("AWS_PROFILE")
-		viper.BindEnv("CLUSTER")
-		viper.BindEnv("SERVICE")
+
+		viper.BindPFlag("CLUSTER", rootCmd.Flags().Lookup("cluster"))
+		viper.BindPFlag("SERVICE", rootCmd.Flags().Lookup("service"))
 
 		return
 	}
