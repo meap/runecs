@@ -17,8 +17,6 @@ export AWS_SECRET_ACCESS_KEY=
 export AWS_REGION=
 ```
 
-You need to define a profile to specify the target environment in which to run the task.
-
 ### Profiles
 
 You can have individual service settings stored in profiles. Profile is a file with the following structure:
