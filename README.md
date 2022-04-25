@@ -40,54 +40,58 @@ runecs revisions --profile myservice --last 10
 
 ## Commands
 
-### RUN
-
-Executing a one-off process:
-
-```shell
-runecs run rake db:migrate --cluster mycluster \
-  --service myservice \
-  --image-tag latest \
-
-runecs run rake db:migrate --cluster mycluster \
-  --service myservice \
-  --wait
-```
+### Run
 
 The process runs using the last task definition. Using the `--image-tag` parameter creates a new task definition with which to run the process.
 
 The task is run asynchronously by default. Using the `--wait` argument, the task starts synchronously and returns the EXIT code of the container.
 
-### PRUNE
+Executing a one-off process asynchronously:
+
+```shell
+runecs run rake db:migrate \
+  --cluster mycluster --service myservice \
+  --image-tag latest
+````
+
+Executing a one-off process synchronously:
+
+```shell
+runecs run rake db:migrate \
+  --cluster mycluster --service myservice \
+  --image-tag latest \
+  --wait
+```
+
+### Prune
 
 [Deregisters](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html) old task definitions.
 
 Use `--keep-last` and `--keep-days` to ensure that a certain number of definitions are always available.
 
 ```shell
-runecs prune --cluster mycluster --service myservice \
-  --keep-last 10 \
-  --keep-days 5
+runecs prune \
+  --cluster mycluster --service myservice \
+  --keep-last 10 --keep-days 5
 ```
 
-### DEPLOY
+### Deploy
 
-Creates a new task definition with the specified `IMAGE_TAG` and updates the service to use the created task definition for new tasks.
+Creates a new task definition with the specified image tag and updates the service to use the created task definition for new tasks.
 
 ```shell
-runecs --cluster mycluster \
-       --service website \
-       --image-tag latest \
-       deploy
+runecs deploy \
+  --cluster mycluster --service myservice \
+  --image-tag latest
 ```
 
-### REVISIONS
+### Revisions
 
-Prints a list of revisions of the task definition. Sorted from newest to oldest. Displays the `DOCKER_URI` used in the revision.
+Prints a list of revisions of the task definition. Sorted from newest to oldest. Displays the Docker image URI used in the revision.
 
 ```shell
-runecs revisions --cluster mycluster \
-  --service myservice \
+runecs revisions \
+  --cluster mycluster --service myservice \
   --last 10
 ```
 
@@ -101,4 +105,3 @@ make
 
 ./bin/runecs --help
 ```
-
