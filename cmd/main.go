@@ -98,7 +98,7 @@ func init() {
 		},
 	}
 
-	deployCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-uri", "i", "", "new docker image uri")
+	deployCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
 	rootCmd.AddCommand(deployCmd)
 
 	///////////////
