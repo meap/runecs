@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -127,11 +128,11 @@ func (s *Service) wait(client *ecs.Client, task string) (bool, error) {
 		return false, err
 	}
 
-	// if output.Tasks[0].Containers[0].ExitCode != 0 {
-	// 	return false, fmt.Errorf("task %s failed", output.Tasks[0].TaskArn)
-	// }
-
-	// log.Printf("task %s status: %d", *output.Tasks[0].TaskArn, output.Tasks[0].Containers[0].ExitCode)
+	if *output.Tasks[0].LastStatus == "STOPPED" {
+		if exitCode := *output.Tasks[0].Containers[0].ExitCode; exitCode != 0 {
+			return true, fmt.Errorf("task %s failed with exit code %d", *output.Tasks[0].TaskArn, exitCode)
+		}
+	}
 
 	return *output.Tasks[0].LastStatus == "STOPPED", nil
 }
