@@ -39,6 +39,29 @@ func (s *Service) getFamilyPrefix(svc *ecs.Client) (string, error) {
 	return *response.TaskDefinition.Family, nil
 }
 
+func (s *Service) latestTaskDefinition(svc *ecs.Client) (string, error) {
+	_, err := s.loadService(svc)
+	if err != nil {
+		return "", err
+	}
+
+	prefix, err := s.getFamilyPrefix(svc)
+	if err != nil {
+		return "", err
+	}
+
+	response, err := svc.ListTaskDefinitions(context.TODO(), &ecs.ListTaskDefinitionsInput{
+		FamilyPrefix: &prefix,
+		Sort:         types.SortOrderDesc,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return response.TaskDefinitionArns[0], nil
+}
+
 func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *ecs.Client) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &familyPrefix,

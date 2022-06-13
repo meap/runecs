@@ -11,15 +11,20 @@ import (
 )
 
 func (s *Service) cloneTaskDef(dockerImageTag string, svc *ecs.Client) (string, error) {
-	service, err := s.loadService(svc)
+	_, err := s.loadService(svc)
 	if err != nil {
 		return "", err
 	}
 
 	// Get the last task definition ARN.
 	// Load the latest task definition.
+	latestDef, err := s.latestTaskDefinition(svc)
+	if err != nil {
+		return "", nil
+	}
+
 	response, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
-		TaskDefinition: service.TaskDefinition,
+		TaskDefinition: &latestDef,
 	})
 
 	if err != nil {
