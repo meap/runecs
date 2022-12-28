@@ -31,12 +31,21 @@ func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
 	}
 
 	def := resp.Services[0]
-	log.Printf("Service '%s' loaded.", *def.ServiceName)
+	fmt.Printf("Service '%s' loaded. \n", *def.ServiceName)
+
+	// Fetch the latest task definition. Keep in mind that the active service may
+	// have a different task definition that is available, see. *def.TaskDefinition
+	//
+	// TODO: Define by CLI input parameter?
+	taskDef, err := s.latestTaskDefinition(client)
+	if err != nil {
+		return serviceDef{}, err
+	}
 
 	return serviceDef{
 		Subnets:        def.NetworkConfiguration.AwsvpcConfiguration.Subnets,
 		SecurityGroups: def.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
-		TaskDef:        *def.TaskDefinition,
+		TaskDef:        taskDef,
 	}, nil
 }
 

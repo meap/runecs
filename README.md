@@ -7,35 +7,17 @@ RunECS is a tool for running one-off processes in an ECS cluster. The tool was c
 * Only FARGATE launch type is supported.
 * One container in the task.
 
+
 ## How to Use
 
-RunECS works in a cluster with the service. You must define `--cluster` and `--service`. In this case, AWS authorization can be addressed by environment variables:
+RunECS executes the command using the specified service. The service must be specified in `cluster/service` format. Further, you must specify the environment variables that determine access to AWS.
 
 ```
-export AWS_ACCESS_KEY_ID=
-export AWS_SECRET_ACCESS_KEY=
-export AWS_REGION=
-```
+export AWS_ACCESS_KEY_ID=xxxxxx
+export AWS_SECRET_ACCESS_KEY=xxxxxxx
+export AWS_REGION=eu-east1
 
-### Profiles
-
-You can have individual service settings stored in profiles. Profile is a file with the following structure:
-
-```yaml
-AwsProfile: myprofile
-AwsRegion: eu-west-1
-Cluster: mycluster
-Service: myservice
-```
-
-`AwsProfile` says that the AWS [named profile](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html) is used.
-
-The profile name determines the name of the environment settings file.The file must be placed at `~/.runecs/profiles/myservice.yml`. In this case, the profile is named `myservice`.
-
-Usage:
-
-```shell
-runecs revisions --profile myservice --last 10
+runecs rake orders:upload[14021] --service my-cluster/my-service -w
 ```
 
 ## Commands
@@ -50,7 +32,7 @@ Executing a one-off process asynchronously:
 
 ```shell
 runecs run rake db:migrate \
-  --cluster mycluster --service myservice \
+  --service my-cluster/my-service \
   --image-tag latest
 ````
 
@@ -58,7 +40,7 @@ Executing a one-off process synchronously:
 
 ```shell
 runecs run rake db:migrate \
-  --cluster mycluster --service myservice \
+  --service my-cluster/my-service \
   --image-tag latest \
   --wait
 ```
@@ -71,7 +53,7 @@ Use `--keep-last` and `--keep-days` to ensure that a certain number of definitio
 
 ```shell
 runecs prune \
-  --cluster mycluster --service myservice \
+  --service my-cluster/my-service \
   --keep-last 10 --keep-days 5
 ```
 
@@ -81,7 +63,7 @@ Creates a new task definition with the specified image tag and updates the servi
 
 ```shell
 runecs deploy \
-  --cluster mycluster --service myservice \
+  --service my-cluster/my-service \
   --image-tag latest
 ```
 
@@ -91,7 +73,7 @@ Prints a list of revisions of the task definition. Sorted from newest to oldest.
 
 ```shell
 runecs revisions \
-  --cluster mycluster --service myservice \
+  --service my-cluster/my-service \
   --last 10
 ```
 

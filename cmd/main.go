@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/go-playground/validator"
 	"github.com/spf13/cobra"
@@ -25,21 +26,12 @@ import (
 	"runecs.io/v1/pkg/ecs"
 )
 
-var (
-	profile string
-	verbose bool
-)
-
 var rootCmd = &cobra.Command{}
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "profile name with ECS cluster settings")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "verbose output")
-	rootCmd.PersistentFlags().String("cluster", "", "ECS cluster name")
-	rootCmd.PersistentFlags().String("service", "", "ECS service name")
+	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-
-	cobra.OnInitialize(initConfig)
+	viper.BindPFlag("service", rootCmd.PersistentFlags().Lookup("service"))
 
 	var dockerImageTag string
 	var dryRun bool
@@ -122,7 +114,14 @@ func init() {
 
 func initService() *ecs.Service {
 	svc := ecs.Service{}
-	viper.Unmarshal(&svc)
+
+	parsed := strings.Split(viper.GetString("service"), "/")
+	if len(parsed) != 2 {
+		log.Fatalf("Invalid service name format %s\n", viper.GetString("service"))
+	}
+
+	svc.Cluster = parsed[0]
+	svc.Service = parsed[1]
 
 	validate := validator.New()
 	if err := validate.Struct(&svc); err != nil {
@@ -130,31 +129,6 @@ func initService() *ecs.Service {
 	}
 
 	return &svc
-}
-
-func initConfig() {
-	if profile == "" {
-		viper.AutomaticEnv()
-		viper.BindEnv("AWS_REGION")
-		viper.BindEnv("AWS_PROFILE")
-
-		viper.BindPFlag("CLUSTER", rootCmd.Flags().Lookup("cluster"))
-		viper.BindPFlag("SERVICE", rootCmd.Flags().Lookup("service"))
-
-		return
-	}
-
-	viper.AddConfigPath("$HOME/.runecs/profiles")
-	viper.AddConfigPath("./profiles")
-
-	viper.SetConfigName(fmt.Sprintf("%s.yml", profile))
-	viper.SetConfigType("yml")
-
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
 }
 
 func Execute() {

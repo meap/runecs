@@ -26,10 +26,8 @@ import (
 
 // ECS parameters that are used to run jobs.
 type Service struct {
-	AwsRegion  string `mapstructure:"AWS_REGION" validate:"required"`
-	AwsProfile string `mapstructure:"AWS_PROFILE"`
-	Cluster    string `mapstructure:"CLUSTER" validate:"required"`
-	Service    string `mapstructure:"SERVICE" validate:"required"`
+	Cluster string `mapstructure:"CLUSTER" validate:"required"`
+	Service string `mapstructure:"SERVICE" validate:"required"`
 }
 
 func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
@@ -47,14 +45,9 @@ func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
 
 func (s *Service) initCfg() (aws.Config, error) {
 	configFunctions := []func(*config.LoadOptions) error{
-		config.WithDefaultRegion(s.AwsRegion),
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithMaxAttempts(retry.NewStandard(), 10)
 		}),
-	}
-
-	if s.AwsProfile != "" {
-		configFunctions = append(configFunctions, config.WithSharedConfigProfile(s.AwsProfile))
 	}
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), configFunctions...)
