@@ -1,14 +1,14 @@
 # Overview
 
-RunECS is a tool for running one-off processes in an ECS cluster. The tool was created as a simple solution for occasional running of processes in the ECS cluster - e.g. various data migrations. 
+RunECS is a tool for executing one-off processes in an ECS cluster.
 
 ## Limitations
 
 * Only FARGATE launch type is supported.
-* One container in the task.
+* Sidecar containers are not supported
 
 
-## How to Use
+# How to Use
 
 RunECS executes the command using the specified service. The service must be specified in `cluster/service` format. Further, you must specify the environment variables that determine access to AWS.
 
@@ -24,7 +24,7 @@ runecs rake orders:upload[14021] --service my-cluster/my-service -w
 
 ### Run
 
-The process runs using the last task definition. Using the `--image-tag` parameter creates a new task definition with which to run the process.
+Executes the process using the last available task definition. You can pick a specific docker tag by using the `--image-tag` argument. In this case, it changes the task definition and inserts the specified docker tag. 
 
 The task is run asynchronously by default. Using the `--wait` argument, the task starts synchronously and returns the EXIT code of the container.
 
@@ -75,15 +75,4 @@ Prints a list of revisions of the task definition. Sorted from newest to oldest.
 runecs revisions \
   --service my-cluster/my-service \
   --last 10
-```
-
-# Build
-
-```shell
-git clone git@github.com:meap/runecs.git
-
-cd runecs
-make
-
-./bin/runecs --help
 ```
