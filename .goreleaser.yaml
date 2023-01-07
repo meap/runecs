@@ -35,3 +35,15 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+
+brews:
+  -
+    name: runecs
+    homepage: https://github.com/meap/runecs
+    tap:
+      owner: meap
+      name: homebrew
+    commit_author:
+      name: meap
+      email: petr@tapmates.com
+      
