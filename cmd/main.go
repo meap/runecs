@@ -29,8 +29,8 @@ import (
 var rootCmd = &cobra.Command{}
 
 func init() {
-	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
 	viper.BindPFlag("service", rootCmd.PersistentFlags().Lookup("service"))
 
 	var dockerImageTag string

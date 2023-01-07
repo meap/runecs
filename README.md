@@ -7,6 +7,18 @@ RunECS is a tool for executing one-off processes in an ECS cluster.
 * Only FARGATE launch type is supported.
 * Sidecar containers are not supported
 
+# Install
+
+## Manual
+
+Download the binary file for your platform, [see releases](https://github.com/meap/runecs/releases).
+
+## Homebrew
+
+```shell
+brew tap meap/runecs
+brew install runecs
+```
 
 # How to Use
 

@@ -10,6 +10,7 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}`.
 
 archives:
   - format: tar.gz
@@ -42,8 +43,8 @@ brews:
     homepage: https://github.com/meap/runecs
     tap:
       owner: meap
-      name: homebrew
+      name: homebrew-runecs
     commit_author:
       name: meap
       email: petr@tapmates.com
-      
+
