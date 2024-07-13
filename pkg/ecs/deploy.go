@@ -31,10 +31,6 @@ func (s *Service) cloneTaskDef(dockerImageTag string, svc *ecs.Client) (string, 
 		return "", err
 	}
 
-	if len(response.TaskDefinition.ContainerDefinitions) > 1 {
-		return "", fmt.Errorf("multiple container definitions in a single task are not supported")
-	}
-
 	newDef := &ecs.RegisterTaskDefinitionInput{}
 	copier.Copy(newDef, response.TaskDefinition)
 
