@@ -26,8 +26,8 @@ import (
 
 // ECS parameters that are used to run jobs.
 type Service struct {
-	Cluster string `mapstructure:"CLUSTER" validate:"required"`
-	Service string `mapstructure:"SERVICE" validate:"required"`
+	Cluster string `mapstructure:"CLUSTER"`
+	Service string `mapstructure:"SERVICE"`
 }
 
 func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {

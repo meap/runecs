@@ -57,7 +57,7 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 
 	////////////////
-	// PRUNE //
+	// PRUNE      //
 	////////////////
 
 	var pruneKeepLast int
@@ -110,18 +110,30 @@ func init() {
 
 	revisionsCmd.PersistentFlags().IntVarP(&lastRevisionNr, "last", "", 0, "last N revisions")
 	rootCmd.AddCommand(revisionsCmd)
+
+	///////////////
+	// LIST      //
+	///////////////
+
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all tasks in the service",
+		Run: func(cmd *cobra.Command, args []string) {
+			svc := initService()
+			svc.List()
+		},
+	}
+	rootCmd.AddCommand(listCmd)
 }
 
 func initService() *ecs.Service {
 	svc := ecs.Service{}
 
 	parsed := strings.Split(viper.GetString("service"), "/")
-	if len(parsed) != 2 {
-		log.Fatalf("Invalid service name format %s\n", viper.GetString("service"))
+	if len(parsed) == 2 {
+		svc.Cluster = parsed[0]
+		svc.Service = parsed[1]
 	}
-
-	svc.Cluster = parsed[0]
-	svc.Service = parsed[1]
 
 	validate := validator.New()
 	if err := validate.Struct(&svc); err != nil {

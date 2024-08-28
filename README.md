@@ -57,6 +57,14 @@ runecs run rake db:migrate \
   --wait
 ```
 
+### List
+
+The main parameter is the name of the ECS service within which the command is to be executed. The parameter value consists of the cluster name and its service. To make it easier, we have introduced a command **list** that lists all these services in the specified region.
+
+```shell
+runecs list
+```
+
 ### Prune
 
 [Deregisters](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html) old task definitions.
