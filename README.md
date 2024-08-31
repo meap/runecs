@@ -1,24 +1,26 @@
-# Overview
+<div align="center">
 
-RunECS is a tool for executing one-off processes in an ECS cluster.
+<img width="106px" alt="elastic container service logo" src="images/amazon_ecs-icon.svg">
 
-## Limitations
+# RunECS CLI
 
-* Only FARGATE launch type is supported.
-* Sidecar containers are not supported
+RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster.
+
+</div>
 
 # Install
 
-## Manual
-
-Download the binary file for your platform, [see releases](https://github.com/meap/runecs/releases).
-
-## Homebrew
+## 🍺 Homebrew
 
 ```shell
 brew tap meap/runecs
 brew install runecs
 ```
+
+## 📦 Other way
+
+Download the binary file for your platform, [see releases](https://github.com/meap/runecs/releases).
+
 
 # How to Use
 
@@ -96,3 +98,9 @@ runecs revisions \
   --service my-cluster/my-service \
   --last 10
 ```
+
+## Limitations
+
+* Only FARGATE launch type is supported.
+* Sidecar containers are not supported
+
