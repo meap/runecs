@@ -1,8 +1,12 @@
+version: 2
+
 project_name: runecs
+
 before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -10,7 +14,15 @@ builds:
       - linux
       - windows
       - darwin
-    ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}`.
+    goarch:
+      - amd64
+      - 386
+      - arm
+      - arm64
+    goarm:
+      - 6
+      - 7            
+    ldflags: -s -w -extldflags "-static" -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}`.
 
 archives:
   - format: tar.gz
@@ -26,10 +38,13 @@ archives:
     format_overrides:
     - goos: windows
       format: zip
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
@@ -38,13 +53,12 @@ changelog:
       - '^test:'
 
 brews:
-  -
+  - 
     name: runecs
+    description: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster
     homepage: https://github.com/meap/runecs
-    tap:
-      owner: meap
-      name: homebrew-runecs
     commit_author:
       name: meap
       email: petr@tapmates.com
+    license: "Apache-2.0"
 
