@@ -17,7 +17,9 @@ type serviceDef struct {
 }
 
 type taskDef struct {
-	Name string
+	Name            string
+	LogGroup        string
+	LogStreamPrefix string
 }
 
 func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
@@ -49,12 +51,23 @@ func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
 	}, nil
 }
 
-func (s *Service) describeTask(client *ecs.Client, taskArn *string) taskDef {
+func (s *Service) describeTask(client *ecs.Client, taskArn *string) (taskDef, error) {
 	resp, _ := client.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 
-	return taskDef{
-		Name: *resp.TaskDefinition.ContainerDefinitions[0].Name,
+	if len(resp.TaskDefinition.ContainerDefinitions) == 0 {
+		return taskDef{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
 	}
+
+	output := taskDef{}
+	output.Name = *resp.TaskDefinition.ContainerDefinitions[0].Name
+
+	logConfig := resp.TaskDefinition.ContainerDefinitions[0].LogConfiguration
+	if logConfig != nil && logConfig.LogDriver == types.LogDriverAwslogs {
+		output.LogGroup = logConfig.Options["awslogs-group"]
+		output.LogStreamPrefix = logConfig.Options["awslogs-stream-prefix"]
+	}
+
+	return output, nil
 }
 
 func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
@@ -70,7 +83,10 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 		log.Fatalf("An error occurred while loading the service %s in the cluster %s: %v", s.Service, s.Cluster, err)
 	}
 
-	tdef := s.describeTask(svc, &sdef.TaskDef)
+	tdef, err := s.describeTask(svc, &sdef.TaskDef)
+	if err != nil {
+		log.Fatalf("An error occurred while loading the task definition %s: %v", sdef.TaskDef, err)
+	}
 
 	var taskDef string
 
@@ -108,12 +124,18 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 		log.Fatalln(err)
 	}
 
-	log.Printf("task %s executed", *output.Tasks[0].TaskArn)
+	executedTask := output.Tasks[0]
+
+	log.Printf("Task %s executed", *executedTask.TaskArn)
 	if wait {
 		for {
-			success, err := s.wait(svc, *output.Tasks[0].TaskArn)
+			success, err := s.wait(svc, *executedTask.TaskArn)
 			if err != nil {
-				log.Fatal(err)
+				logsErr := s.printProcessLogs(tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name)
+				if logsErr != nil {
+					log.Printf("Failed to fetch events from CloudWatch %v", logsErr)
+				}
+				log.Fatalln(err)
 			}
 
 			if success {
@@ -123,7 +145,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 			time.Sleep(6 * time.Second)
 		}
 
-		log.Printf("task %s finished", *output.Tasks[0].TaskArn)
+		log.Printf("task %s finished", *executedTask.TaskArn)
 	}
 }
 
