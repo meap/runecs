@@ -44,12 +44,10 @@ checksum:
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
+report_sizes: true
+
+metadata:
+  mod_timestamp: "{{ .CommitTimestamp }}"
 
 brews:
   - 
@@ -63,4 +61,3 @@ brews:
     repository:
       owner: meap
       name: homebrew-runecs
-      token: "{{ .Env.PUBLISHER_TOKEN }}"
