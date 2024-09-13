@@ -17,6 +17,20 @@ brew tap meap/runecs
 brew install runecs
 ```
 
+## Using Docker
+
+The easiest way to get started with runecs using Docker is by running this command.
+
+```
+docker run \
+  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+  -e AWS_REGION=$AWS_REGION \
+  preichl/runecs list
+```
+
+> Note: You have to pass the environment variables with AWS credentials. I recommend using [direnv](https://direnv.net/) which I mentioned in our [introduction post](https://dev.to/preichl/streamline-your-ecs-workflow-easy-database-migrations-with-a-runecs-cli-tool-5d2h).
+
 ## 📦 Other way
 
 Download the binary file for your platform, [see releases](https://github.com/meap/runecs/releases).
