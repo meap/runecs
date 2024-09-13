@@ -22,8 +22,8 @@ type taskDef struct {
 	LogStreamPrefix string
 }
 
-func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
-	resp, err := client.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
+func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serviceDef, error) {
+	resp, err := client.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster:  &s.Cluster,
 		Services: []string{s.Service},
 	})
@@ -39,7 +39,7 @@ func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
 	// have a different task definition that is available, see. *def.TaskDefinition
 	//
 	// TODO: Define by CLI input parameter?
-	taskDef, err := s.latestTaskDefinition(client)
+	taskDef, err := s.latestTaskDefinition(ctx, client)
 	if err != nil {
 		return serviceDef{}, err
 	}
@@ -51,8 +51,8 @@ func (s *Service) describeService(client *ecs.Client) (serviceDef, error) {
 	}, nil
 }
 
-func (s *Service) describeTask(client *ecs.Client, taskArn *string) (taskDef, error) {
-	resp, _ := client.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
+func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (taskDef, error) {
+	resp, _ := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 
 	if len(resp.TaskDefinition.ContainerDefinitions) == 0 {
 		return taskDef{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
@@ -70,20 +70,42 @@ func (s *Service) describeTask(client *ecs.Client, taskArn *string) (taskDef, er
 	return output, nil
 }
 
+func (s *Service) wait(ctx context.Context, client *ecs.Client, task string) (bool, error) {
+	output, err := client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
+		Cluster: &s.Cluster,
+		Tasks:   []string{task},
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	if *output.Tasks[0].LastStatus == "STOPPED" {
+		if exitCode := *output.Tasks[0].Containers[0].ExitCode; exitCode != 0 {
+			return true, fmt.Errorf("task %s failed with exit code %d", *output.Tasks[0].TaskArn, exitCode)
+		}
+	}
+
+	return *output.Tasks[0].LastStatus == "STOPPED", nil
+}
+
 func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	cfg, err := s.initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	svc := ecs.NewFromConfig(cfg)
 
-	sdef, err := s.describeService(svc)
+	sdef, err := s.describeService(ctx, svc)
 	if err != nil {
 		log.Fatalf("An error occurred while loading the service %s in the cluster %s: %v", s.Service, s.Cluster, err)
 	}
 
-	tdef, err := s.describeTask(svc, &sdef.TaskDef)
+	tdef, err := s.describeTask(ctx, svc, &sdef.TaskDef)
 	if err != nil {
 		log.Fatalf("An error occurred while loading the task definition %s: %v", sdef.TaskDef, err)
 	}
@@ -91,7 +113,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	var taskDef string
 
 	if dockerImageTag != "" {
-		taskDef, err = s.cloneTaskDef(dockerImageTag, svc)
+		taskDef, err = s.cloneTaskDef(ctx, dockerImageTag, svc)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -101,7 +123,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 		log.Printf("The task definition %s is used", taskDef)
 	}
 
-	output, err := svc.RunTask(context.TODO(), &ecs.RunTaskInput{
+	output, err := svc.RunTask(ctx, &ecs.RunTaskInput{
 		Cluster:        &s.Cluster,
 		TaskDefinition: &taskDef,
 		LaunchType:     "FARGATE",
@@ -129,9 +151,9 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	log.Printf("Task %s executed", *executedTask.TaskArn)
 	if wait {
 		for {
-			success, err := s.wait(svc, *executedTask.TaskArn)
+			success, err := s.wait(ctx, svc, *executedTask.TaskArn)
 			if err != nil {
-				logsErr := s.printProcessLogs(tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name)
+				logsErr := s.printProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name)
 				if logsErr != nil {
 					log.Printf("Failed to fetch events from CloudWatch %v", logsErr)
 				}
@@ -147,23 +169,4 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 
 		log.Printf("task %s finished", *executedTask.TaskArn)
 	}
-}
-
-func (s *Service) wait(client *ecs.Client, task string) (bool, error) {
-	output, err := client.DescribeTasks(context.TODO(), &ecs.DescribeTasksInput{
-		Cluster: &s.Cluster,
-		Tasks:   []string{task},
-	})
-
-	if err != nil {
-		return false, err
-	}
-
-	if *output.Tasks[0].LastStatus == "STOPPED" {
-		if exitCode := *output.Tasks[0].Containers[0].ExitCode; exitCode != 0 {
-			return true, fmt.Errorf("task %s failed with exit code %d", *output.Tasks[0].TaskArn, exitCode)
-		}
-	}
-
-	return *output.Tasks[0].LastStatus == "STOPPED", nil
 }

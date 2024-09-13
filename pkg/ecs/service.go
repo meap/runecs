@@ -30,8 +30,8 @@ type Service struct {
 	Service string `mapstructure:"SERVICE"`
 }
 
-func (s *Service) loadService(svc *ecs.Client) (types.Service, error) {
-	response, err := svc.DescribeServices(context.TODO(), &ecs.DescribeServicesInput{
+func (s *Service) loadService(ctx context.Context, svc *ecs.Client) (types.Service, error) {
+	response, err := svc.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster:  &s.Cluster,
 		Services: []string{s.Service},
 	})
@@ -50,7 +50,7 @@ func (s *Service) initCfg() (aws.Config, error) {
 		}),
 	}
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), configFunctions...)
+	cfg, err := config.LoadDefaultConfig(context.Background(), configFunctions...)
 
 	if err != nil {
 		return aws.Config{}, err

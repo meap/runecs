@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
-func (s *Service) deregisterTaskFamily(family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) {
+func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &family,
 		Sort:         types.SortOrderDesc,
@@ -22,7 +22,7 @@ func (s *Service) deregisterTaskFamily(family string, keepLast int, keepDays int
 	keep := 0
 
 	for {
-		resp, err := svc.ListTaskDefinitions(context.TODO(), definitionInput)
+		resp, err := svc.ListTaskDefinitions(ctx, definitionInput)
 		if err != nil {
 			log.Fatalln("Loading the list of definitions failed.")
 		}
@@ -31,7 +31,7 @@ func (s *Service) deregisterTaskFamily(family string, keepLast int, keepDays int
 		totalCount += count
 
 		for _, def := range resp.TaskDefinitionArns {
-			response, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
+			response, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 				TaskDefinition: &def,
 			})
 
@@ -57,7 +57,7 @@ func (s *Service) deregisterTaskFamily(family string, keepLast int, keepDays int
 			deleted++
 
 			if !dryRun {
-				_, err := svc.DeregisterTaskDefinition(context.TODO(), &ecs.DeregisterTaskDefinitionInput{TaskDefinition: &def})
+				_, err := svc.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: &def})
 				if err != nil {
 					fmt.Printf("Deregistering the task definition %s failed. (%v)\n", def, err)
 					continue
@@ -86,19 +86,22 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) {
 		log.Fatalln(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	svc := ecs.NewFromConfig(cfg)
 
-	familyPrefix, err := s.getFamilyPrefix(svc)
+	familyPrefix, err := s.getFamilyPrefix(ctx, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	response, err := s.getFamilies(familyPrefix, svc)
+	response, err := s.getFamilies(ctx, familyPrefix, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	for _, family := range response {
-		s.deregisterTaskFamily(family, keepLast, keepDays, dryRun, svc)
+		s.deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, svc)
 	}
 }

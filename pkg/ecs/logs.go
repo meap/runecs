@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 )
 
-func (s *Service) printProcessLogs(logGroupname string, logStreamPrefix string, taskArn string, name string) error {
+func (s *Service) printProcessLogs(ctx context.Context, logGroupname string, logStreamPrefix string, taskArn string, name string) error {
 	log.Printf("Loading logs for %s: %s", logGroupname, taskArn)
 
 	cfg, err := s.initCfg()
@@ -20,7 +20,7 @@ func (s *Service) printProcessLogs(logGroupname string, logStreamPrefix string, 
 	processId := extractProcessId(taskArn)
 	client := cloudwatchlogs.NewFromConfig(cfg)
 
-	output, err := client.FilterLogEvents(context.TODO(), &cloudwatchlogs.FilterLogEventsInput{
+	output, err := client.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{
 		LogGroupName:   aws.String(logGroupname),
 		LogStreamNames: []string{fmt.Sprintf("%s/%s/%s", logStreamPrefix, name, processId)},
 	})

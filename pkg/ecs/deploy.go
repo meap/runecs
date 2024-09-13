@@ -5,25 +5,26 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/jinzhu/copier"
 )
 
-func (s *Service) cloneTaskDef(dockerImageTag string, svc *ecs.Client) (string, error) {
-	_, err := s.loadService(svc)
+func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *ecs.Client) (string, error) {
+	_, err := s.loadService(ctx, svc)
 	if err != nil {
 		return "", err
 	}
 
 	// Get the last task definition ARN.
 	// Load the latest task definition.
-	latestDef, err := s.latestTaskDefinition(svc)
+	latestDef, err := s.latestTaskDefinition(ctx, svc)
 	if err != nil {
 		return "", nil
 	}
 
-	response, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
+	response, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: &latestDef,
 	})
 
@@ -43,7 +44,7 @@ func (s *Service) cloneTaskDef(dockerImageTag string, svc *ecs.Client) (string, 
 
 	newDef.ContainerDefinitions[0].Image = &newDockerURI
 
-	output, err := svc.RegisterTaskDefinition(context.TODO(), newDef)
+	output, err := svc.RegisterTaskDefinition(ctx, newDef)
 	if err != nil {
 		return "", err
 	}
@@ -57,17 +58,20 @@ func (s *Service) Deploy(dockerImageTag string) {
 		log.Fatalln(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	svc := ecs.NewFromConfig(cfg)
 
 	// Clones the latest version of the task definition and inserts the new Docker URI.
-	taskDefinitionArn, err := s.cloneTaskDef(dockerImageTag, svc)
+	taskDefinitionArn, err := s.cloneTaskDef(ctx, dockerImageTag, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	fmt.Printf("New revision of the task %s has been created\n", taskDefinitionArn)
 
-	updateOutput, err := svc.UpdateService(context.TODO(), &ecs.UpdateServiceInput{
+	updateOutput, err := svc.UpdateService(ctx, &ecs.UpdateServiceInput{
 		Cluster:        &s.Cluster,
 		Service:        &s.Service,
 		TaskDefinition: &taskDefinitionArn,

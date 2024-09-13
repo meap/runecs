@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -10,8 +11,8 @@ import (
 	"github.com/rodaine/table"
 )
 
-func (s *Service) getFamilies(familyPrefix string, svc *ecs.Client) ([]string, error) {
-	response, err := svc.ListTaskDefinitionFamilies(context.TODO(), &ecs.ListTaskDefinitionFamiliesInput{
+func (s *Service) getFamilies(ctx context.Context, familyPrefix string, svc *ecs.Client) ([]string, error) {
+	response, err := svc.ListTaskDefinitionFamilies(ctx, &ecs.ListTaskDefinitionFamiliesInput{
 		FamilyPrefix: &familyPrefix,
 	})
 
@@ -22,13 +23,13 @@ func (s *Service) getFamilies(familyPrefix string, svc *ecs.Client) ([]string, e
 	return response.Families, nil
 }
 
-func (s *Service) getFamilyPrefix(svc *ecs.Client) (string, error) {
-	service, err := s.loadService(svc)
+func (s *Service) getFamilyPrefix(ctx context.Context, svc *ecs.Client) (string, error) {
+	service, err := s.loadService(ctx, svc)
 	if err != nil {
 		return "", err
 	}
 
-	response, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
+	response, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: service.TaskDefinition,
 	})
 
@@ -39,18 +40,18 @@ func (s *Service) getFamilyPrefix(svc *ecs.Client) (string, error) {
 	return *response.TaskDefinition.Family, nil
 }
 
-func (s *Service) latestTaskDefinition(svc *ecs.Client) (string, error) {
-	_, err := s.loadService(svc)
+func (s *Service) latestTaskDefinition(ctx context.Context, svc *ecs.Client) (string, error) {
+	_, err := s.loadService(ctx, svc)
 	if err != nil {
 		return "", err
 	}
 
-	prefix, err := s.getFamilyPrefix(svc)
+	prefix, err := s.getFamilyPrefix(ctx, svc)
 	if err != nil {
 		return "", err
 	}
 
-	response, err := svc.ListTaskDefinitions(context.TODO(), &ecs.ListTaskDefinitionsInput{
+	response, err := svc.ListTaskDefinitions(ctx, &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &prefix,
 		Sort:         types.SortOrderDesc,
 	})
@@ -62,7 +63,7 @@ func (s *Service) latestTaskDefinition(svc *ecs.Client) (string, error) {
 	return response.TaskDefinitionArns[0], nil
 }
 
-func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *ecs.Client) {
+func (s *Service) printRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int, svc *ecs.Client) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &familyPrefix,
 		Sort:         types.SortOrderDesc,
@@ -77,7 +78,7 @@ func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *
 	total := 0
 
 	for {
-		response, err := svc.ListTaskDefinitions(context.TODO(), definitionInput)
+		response, err := svc.ListTaskDefinitions(ctx, definitionInput)
 
 		if err != nil {
 			log.Fatalln(err)
@@ -88,7 +89,7 @@ func (s *Service) printRevisions(familyPrefix string, lastRevisionsNr int, svc *
 				break
 			}
 
-			resp, err := svc.DescribeTaskDefinition(context.TODO(), &ecs.DescribeTaskDefinitionInput{
+			resp, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 				TaskDefinition: &def,
 			})
 
@@ -117,19 +118,22 @@ func (s *Service) Revisions(lastRevisionNr int) {
 		log.Fatalln(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	svc := ecs.NewFromConfig(cfg)
 
-	familyPrefix, err := s.getFamilyPrefix(svc)
+	familyPrefix, err := s.getFamilyPrefix(ctx, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	response, err := s.getFamilies(familyPrefix, svc)
+	response, err := s.getFamilies(ctx, familyPrefix, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	for _, family := range response {
-		s.printRevisions(family, lastRevisionNr, svc)
+		s.printRevisions(ctx, family, lastRevisionNr, svc)
 	}
 }
