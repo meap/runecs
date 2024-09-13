@@ -22,17 +22,22 @@ import (
 
 	"github.com/go-playground/validator"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"runecs.io/v1/pkg/ecs"
 )
 
-var rootCmd = &cobra.Command{}
+var service string
+
+var rootCmd = &cobra.Command{
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Name() != "list" && service == "" {
+			return fmt.Errorf("--service flag is required for this command")
+		}
+
+		return nil
+	},
+}
 
 func init() {
-	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
-	viper.BindPFlag("service", rootCmd.PersistentFlags().Lookup("service"))
-
 	var dockerImageTag string
 	var dryRun bool
 
@@ -43,9 +48,10 @@ func init() {
 	var execWait bool
 
 	runCmd := &cobra.Command{
-		Use:   "run [cmd]",
-		Short: "Execute a one-off process in an AWS ECS cluster",
-		Args:  cobra.MinimumNArgs(1),
+		Use:                   "run [cmd]",
+		Short:                 "Execute a one-off process in an AWS ECS cluster",
+		Args:                  cobra.MinimumNArgs(1),
+		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
 			svc.Execute(args, execWait, dockerImageTag)
@@ -64,8 +70,9 @@ func init() {
 	var pruneKeepDays int
 
 	pruneCmd := &cobra.Command{
-		Use:   "prune",
-		Short: "Mark task definitions as inactive",
+		Use:                   "prune",
+		Short:                 "Mark task definitions as inactive",
+		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
 			svc.Prune(pruneKeepLast, pruneKeepDays, dryRun)
@@ -82,8 +89,16 @@ func init() {
 	////////////
 
 	deployCmd := &cobra.Command{
-		Use:   "deploy",
-		Short: "Deploy a new version of the task",
+		Use:                   "deploy",
+		Short:                 "Deploy a new version of the task",
+		DisableFlagsInUseLine: true,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if dockerImageTag == "" {
+				return fmt.Errorf("--image-tag flag is required")
+			}
+
+			return nil
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
 			svc.Deploy(dockerImageTag)
@@ -100,8 +115,9 @@ func init() {
 	var lastRevisionNr int
 
 	revisionsCmd := &cobra.Command{
-		Use:   "revisions",
-		Short: "List of available revisions of the task definition.",
+		Use:                   "revisions",
+		Short:                 "List of available revisions of the task definition.",
+		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
 			svc.Revisions(lastRevisionNr)
@@ -116,23 +132,56 @@ func init() {
 	///////////////
 
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all tasks in the service",
+		Use:                   "list",
+		Short:                 "List all tasks in the service",
+		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
 			svc.List()
 		},
 	}
+
 	rootCmd.AddCommand(listCmd)
+
+	////////////////
+	// COMPLETION //
+	////////////////
+
+	completionCmd := &cobra.Command{
+		Use:                   "completion [bash|zsh|fish|powershell]",
+		Short:                 "Generate shell completion scripts",
+		DisableFlagsInUseLine: true,
+		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		Run: func(cmd *cobra.Command, args []string) {
+			switch args[0] {
+			case "bash":
+				cmd.Root().GenBashCompletion(os.Stdout)
+			case "zsh":
+				cmd.Root().GenZshCompletion(os.Stdout)
+			case "fish":
+				cmd.Root().GenFishCompletion(os.Stdout, true)
+			case "powershell":
+				cmd.Root().GenPowerShellCompletion(os.Stdout)
+			}
+		},
+	}
+
+	rootCmd.AddCommand(completionCmd)
+
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	rootCmd.PersistentFlags().StringVar(&service, "service", "", "service name (cluster/service)")
 }
 
 func initService() *ecs.Service {
 	svc := ecs.Service{}
 
-	parsed := strings.Split(viper.GetString("service"), "/")
+	parsed := strings.Split(service, "/")
 	if len(parsed) == 2 {
 		svc.Cluster = parsed[0]
 		svc.Service = parsed[1]
+	} else if service != "" {
+		log.Fatalf("Invalid service name %s\n", service)
 	}
 
 	validate := validator.New()
