@@ -95,8 +95,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 		log.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 

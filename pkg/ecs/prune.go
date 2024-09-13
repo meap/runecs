@@ -86,8 +86,7 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) {
 		log.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/jinzhu/copier"
@@ -58,8 +57,7 @@ func (s *Service) Deploy(dockerImageTag string) {
 		log.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 

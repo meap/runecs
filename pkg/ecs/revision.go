@@ -3,7 +3,6 @@ package ecs
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
@@ -118,8 +117,7 @@ func (s *Service) Revisions(lastRevisionNr int) {
 		log.Fatalln(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 
