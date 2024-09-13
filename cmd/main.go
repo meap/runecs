@@ -71,7 +71,7 @@ func init() {
 
 	pruneCmd := &cobra.Command{
 		Use:                   "prune",
-		Short:                 "Mark task definitions as inactive",
+		Short:                 "Deregister active task definitions",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
@@ -116,7 +116,7 @@ func init() {
 
 	revisionsCmd := &cobra.Command{
 		Use:                   "revisions",
-		Short:                 "List of available revisions of the task definition.",
+		Short:                 "List of active task definitions",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()
@@ -133,7 +133,7 @@ func init() {
 
 	listCmd := &cobra.Command{
 		Use:                   "list",
-		Short:                 "List all tasks in the service",
+		Short:                 "List of all services across clusters in the current region",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			svc := initService()

@@ -22,7 +22,7 @@ builds:
     goarm:
       - 6
       - 7            
-    ldflags: -s -w -extldflags "-static" -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}`.
+    ldflags: -s -w -extldflags "-static" -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}.
 
 archives:
   - format: tar.gz
@@ -61,4 +61,7 @@ brews:
       name: meap
       email: petr@tapmates.com
     license: "Apache-2.0"
+    repository:
+      owner: meap
+      name: homebrew-runecs    
 
