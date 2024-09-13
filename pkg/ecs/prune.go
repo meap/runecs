@@ -62,6 +62,8 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 					fmt.Printf("Deregistering the task definition %s failed. (%v)\n", def, err)
 					continue
 				}
+
+				fmt.Println("Task definition", def, "created", diffInDays, "days ago is deregistered.")
 			}
 		}
 
