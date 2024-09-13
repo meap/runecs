@@ -4,7 +4,6 @@ project_name: runecs
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
 
 builds:
@@ -63,5 +62,4 @@ brews:
     license: "Apache-2.0"
     repository:
       owner: meap
-      name: homebrew-runecs    
-
+      name: homebrew-runecs
