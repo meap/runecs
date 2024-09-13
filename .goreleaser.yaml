@@ -63,3 +63,4 @@ brews:
     repository:
       owner: meap
       name: homebrew-runecs
+      token: "{{ .Env.PUBLISHER_TOKEN }}"
