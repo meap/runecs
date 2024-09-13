@@ -29,7 +29,7 @@ docker run \
   preichl/runecs list
 ```
 
-> Note: You have to pass the environment variables with AWS credentials. I recommend using [direnv](https://direnv.net/) which I mentioned in our [introduction post](https://dev.to/preichl/streamline-your-ecs-workflow-easy-database-migrations-with-a-runecs-cli-tool-5d2h).
+> Note: You have to pass the environment variables with AWS credentials. I recommend using [direnv](https://direnv.net/) which I mentioned in the [introduction post](https://dev.to/preichl/streamline-your-ecs-workflow-easy-database-migrations-with-a-runecs-cli-tool-5d2h).
 
 ## 📦 Other way
 
@@ -118,3 +118,6 @@ runecs revisions \
 * Only FARGATE launch type is supported.
 * Sidecar containers are not supported
 
+# License
+
+RunECS is distributed under [Apache-2.0 license](https://github.com/meap/runecs/blob/main/LICENSE)
