@@ -29,7 +29,17 @@ var service string
 
 var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if cmd.Name() != "list" && service == "" {
+		commandsWithoutService := []string{"completion", "help", "list", "version"}
+
+		serviceRequired := true
+		for _, c := range commandsWithoutService {
+			if cmd.Name() == c {
+				serviceRequired = false
+				break
+			}
+		}
+
+		if serviceRequired && service == "" {
 			return fmt.Errorf("--service flag is required for this command")
 		}
 
