@@ -49,7 +49,6 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	var dockerImageTag string
-	var dryRun bool
 
 	/////////
 	// RUN //
@@ -76,22 +75,23 @@ func init() {
 	// PRUNE      //
 	////////////////
 
-	var pruneKeepLast int
-	var pruneKeepDays int
-
 	pruneCmd := &cobra.Command{
 		Use:                   "prune",
 		Short:                 "Deregister active task definitions",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
+			keepLastNr, _ := cmd.Flags().GetInt("keep-last")
+			keepDays, _ := cmd.Flags().GetInt("keep-days")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+
 			svc := initService()
-			svc.Prune(pruneKeepLast, pruneKeepDays, dryRun)
+			svc.Prune(keepLastNr, keepDays, dryRun)
 		},
 	}
 
-	pruneCmd.PersistentFlags().BoolVarP(&dryRun, "dry-run", "", false, "dry run")
-	pruneCmd.PersistentFlags().IntVarP(&pruneKeepLast, "keep-last", "", 50, "keep last N task definitions")
-	pruneCmd.PersistentFlags().IntVarP(&pruneKeepDays, "keep-days", "", 0, "keep task definitions older than N days")
+	pruneCmd.PersistentFlags().BoolP("dry-run", "", false, "dry run")
+	pruneCmd.PersistentFlags().IntP("keep-last", "", 50, "keep last N task definitions")
+	pruneCmd.PersistentFlags().IntP("keep-days", "", 0, "keep task definitions older than N days")
 	rootCmd.AddCommand(pruneCmd)
 
 	////////////
@@ -122,20 +122,39 @@ func init() {
 	// REVISIONS //
 	///////////////
 
-	var lastRevisionNr int
-
 	revisionsCmd := &cobra.Command{
 		Use:                   "revisions",
 		Short:                 "List of active task definitions",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
+			revNr, _ := cmd.Flags().GetInt("last")
+
 			svc := initService()
-			svc.Revisions(lastRevisionNr)
+			svc.Revisions(revNr)
 		},
 	}
 
-	revisionsCmd.PersistentFlags().IntVarP(&lastRevisionNr, "last", "", 0, "last N revisions")
+	revisionsCmd.PersistentFlags().IntP("last", "", 0, "last N revisions")
 	rootCmd.AddCommand(revisionsCmd)
+
+	///////////////
+	// RESTART   //
+	///////////////
+
+	restartCmd := &cobra.Command{
+		Use:                   "restart",
+		Short:                 "Restart the service",
+		DisableFlagsInUseLine: true,
+		Run: func(cmd *cobra.Command, args []string) {
+			kill, _ := cmd.Flags().GetBool("kill")
+
+			svc := initService()
+			svc.Restart(kill)
+		},
+	}
+
+	restartCmd.PersistentFlags().BoolP("kill", "", false, "Stops running tasks, ECS starts a new one if the health check is properly set")
+	rootCmd.AddCommand(restartCmd)
 
 	///////////////
 	// LIST      //

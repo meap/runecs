@@ -81,6 +81,22 @@ The main parameter is the name of the ECS service within which the command is to
 runecs list
 ```
 
+### Restart
+
+Restarts all running tasks in the service.
+
+```shell
+runecs restart --service my-cluster/myservice
+```
+
+The services restart without downtime. The command initiates new tasks using the last definition. After reaching the running state, ECS automatically shuts down old tasks to achieve the desired number of running tasks.
+
+Another option is to use the `--kill` parameter, which shuts down running tasks in the service. If the service has health checks set up properly, ECS automatically starts new tasks to ensure that the desired number of tasks are running.
+
+```shell
+runecs restart --service my-cluster/myservice --kill
+```
+
 ### Prune
 
 [Deregisters](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html) old task definitions.
