@@ -36,7 +36,9 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 	}
 
 	newDef := &ecs.RegisterTaskDefinitionInput{}
-	copier.Copy(newDef, response.TaskDefinition)
+	if err := copier.Copy(newDef, response.TaskDefinition); err != nil {
+		return "", err
+	}
 
 	split := strings.Split(*newDef.ContainerDefinitions[0].Image, ":")
 	newDockerURI := fmt.Sprintf("%s:%s", split[0], dockerImageTag)

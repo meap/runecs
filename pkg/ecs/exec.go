@@ -10,26 +10,26 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
-type serviceDef struct {
+type serviceDefinition struct {
 	Subnets        []string
 	SecurityGroups []string
 	TaskDef        string
 }
 
-type taskDef struct {
+type taskDefinition struct {
 	Name            string
 	LogGroup        string
 	LogStreamPrefix string
 }
 
-func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serviceDef, error) {
+func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serviceDefinition, error) {
 	resp, err := client.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster:  &s.Cluster,
 		Services: []string{s.Service},
 	})
 
 	if err != nil {
-		return serviceDef{}, err
+		return serviceDefinition{}, err
 	}
 
 	def := resp.Services[0]
@@ -41,24 +41,24 @@ func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serv
 	// TODO: Define by CLI input parameter?
 	taskDef, err := s.latestTaskDefinition(ctx, client)
 	if err != nil {
-		return serviceDef{}, err
+		return serviceDefinition{}, err
 	}
 
-	return serviceDef{
+	return serviceDefinition{
 		Subnets:        def.NetworkConfiguration.AwsvpcConfiguration.Subnets,
 		SecurityGroups: def.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
 		TaskDef:        taskDef,
 	}, nil
 }
 
-func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (taskDef, error) {
+func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (taskDefinition, error) {
 	resp, _ := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 
 	if len(resp.TaskDefinition.ContainerDefinitions) == 0 {
-		return taskDef{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
+		return taskDefinition{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
 	}
 
-	output := taskDef{}
+	output := taskDefinition{}
 	output.Name = *resp.TaskDefinition.ContainerDefinitions[0].Name
 
 	logConfig := resp.TaskDefinition.ContainerDefinitions[0].LogConfiguration

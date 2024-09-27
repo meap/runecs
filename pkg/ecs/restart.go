@@ -68,11 +68,12 @@ func (s *Service) Restart(kill bool) {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		return
 	} else {
 		err := s.forceNewDeploy(context.Background(), svc)
 		if err != nil {
 			log.Fatalln(err)
 		}
 	}
+
+	fmt.Println("Done.")
 }
