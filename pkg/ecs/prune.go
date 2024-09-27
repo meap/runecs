@@ -37,6 +37,7 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 
 			if err != nil {
 				log.Printf("Failed to describe task definition %s. (%v)\n", def, err)
+
 				continue
 			}
 
@@ -46,11 +47,13 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 			if keep < keepLast {
 				fmt.Println("Task definition", def, "created", diffInDays, "days ago is skipped.")
 				keep++
+
 				continue
 			}
 
 			if diffInDays < keepDays {
 				fmt.Println("Task definition", def, "created", diffInDays, "days ago is skipped.")
+
 				continue
 			}
 
@@ -60,6 +63,7 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 				_, err := svc.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: &def})
 				if err != nil {
 					fmt.Printf("Deregistering the task definition %s failed. (%v)\n", def, err)
+
 					continue
 				}
 
@@ -76,6 +80,7 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 
 	if dryRun {
 		fmt.Printf("Total of %d task definitions. Will delete %d definitions.", totalCount, deleted)
+
 		return
 	}
 

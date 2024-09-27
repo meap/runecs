@@ -1,0 +1,25 @@
+linters:
+  enable-all: true
+  disable:
+    - funlen
+    - gochecknoinits
+    - wsl
+    - exhaustruct
+    - execinquery
+    - exportloopref
+    - gomnd
+    - copyloopvar
+    - intrange
+    - gochecknoglobals
+    - wrapcheck
+    - err113
+    - depguard
+    - mnd
+    - lll
+    - cyclop
+    - revive
+    - godox
+    - gofumpt
+    - gosec
+    - contextcheck
+    - forbidigo

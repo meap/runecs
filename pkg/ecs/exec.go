@@ -116,10 +116,10 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 		if err != nil {
 			log.Fatalln(err)
 		}
-		log.Printf("New task definition %s is created", taskDef)
+		fmt.Printf("New task definition %s is created", taskDef)
 	} else {
 		taskDef = sdef.TaskDef
-		log.Printf("The task definition %s is used", taskDef)
+		fmt.Printf("The task definition %s is used", taskDef)
 	}
 
 	output, err := svc.RunTask(ctx, &ecs.RunTaskInput{
@@ -166,6 +166,6 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 			time.Sleep(6 * time.Second)
 		}
 
-		log.Printf("task %s finished", *executedTask.TaskArn)
+		fmt.Printf("task %s finished", *executedTask.TaskArn)
 	}
 }

@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -25,22 +26,27 @@ import (
 	"runecs.io/v1/pkg/ecs"
 )
 
-var service string
+const (
+	defaultLastNumberOfTasks = 50
+	defaultLastDays          = 0
+)
 
 var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		commandsWithoutService := []string{"completion", "help", "list", "version"}
+		serviceValue := cmd.Flag("service").Value.String()
 
 		serviceRequired := true
 		for _, c := range commandsWithoutService {
 			if cmd.Name() == c {
 				serviceRequired = false
+
 				break
 			}
 		}
 
-		if serviceRequired && service == "" {
-			return fmt.Errorf("--service flag is required for this command")
+		if serviceRequired && serviceValue == "" {
+			return errors.New("--service flag is required for this command")
 		}
 
 		return nil
@@ -90,8 +96,8 @@ func init() {
 	}
 
 	pruneCmd.PersistentFlags().BoolP("dry-run", "", false, "dry run")
-	pruneCmd.PersistentFlags().IntP("keep-last", "", 50, "keep last N task definitions")
-	pruneCmd.PersistentFlags().IntP("keep-days", "", 0, "keep task definitions older than N days")
+	pruneCmd.PersistentFlags().IntP("keep-last", "", defaultLastNumberOfTasks, "keep last N task definitions")
+	pruneCmd.PersistentFlags().IntP("keep-days", "", defaultLastDays, "keep task definitions older than N days")
 	rootCmd.AddCommand(pruneCmd)
 
 	////////////
@@ -104,7 +110,7 @@ func init() {
 		DisableFlagsInUseLine: true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if dockerImageTag == "" {
-				return fmt.Errorf("--image-tag flag is required")
+				return errors.New("--image-tag flag is required")
 			}
 
 			return nil
@@ -205,18 +211,19 @@ func init() {
 	rootCmd.AddCommand(completionCmd)
 
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	rootCmd.PersistentFlags().StringVar(&service, "service", "", "service name (cluster/service)")
+	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
 }
 
 func initService() *ecs.Service {
 	svc := ecs.Service{}
+	serviceValue := rootCmd.Flag("service").Value.String()
 
-	parsed := strings.Split(service, "/")
+	parsed := strings.Split(serviceValue, "/")
 	if len(parsed) == 2 {
 		svc.Cluster = parsed[0]
 		svc.Service = parsed[1]
-	} else if service != "" {
-		log.Fatalf("Invalid service name %s\n", service)
+	} else if serviceValue != "" {
+		log.Fatalf("Invalid service name %s\n", serviceValue)
 	}
 
 	validate := validator.New()

@@ -94,6 +94,7 @@ func (s *Service) printRevisions(ctx context.Context, familyPrefix string, lastR
 
 			if err != nil {
 				log.Printf("Failed to describe task definition %s. (%v)\n", def, err)
+
 				continue
 			}
 

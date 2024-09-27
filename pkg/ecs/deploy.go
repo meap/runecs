@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -20,7 +21,7 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 	// Load the latest task definition.
 	latestDef, err := s.latestTaskDefinition(ctx, svc)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	response, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
@@ -32,7 +33,7 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 	}
 
 	if len(response.TaskDefinition.ContainerDefinitions) > 1 {
-		return "", fmt.Errorf("multiple container definitions in a single task are not supported")
+		return "", errors.New("multiple container definitions in a single task are not supported")
 	}
 
 	newDef := &ecs.RegisterTaskDefinitionInput{}

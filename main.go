@@ -14,7 +14,9 @@
 // Package herrors contains common Hugo errors and error related utilities.
 package main
 
-import "runecs.io/v1/cmd"
+import (
+	"runecs.io/v1/cmd"
+)
 
 var (
 	version   = "No version provided"

@@ -24,7 +24,8 @@ func (s *Service) stopAll(ctx context.Context, client *ecs.Client) error {
 			Task:    &taskArn,
 		})
 		if err != nil {
-			log.Println(fmt.Errorf("failed to stop task %s. (%v)", taskArn, err))
+			log.Println(fmt.Errorf("failed to stop task %s. (%w)", taskArn, err))
+
 			continue
 		}
 

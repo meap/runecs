@@ -24,6 +24,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
+const (
+	defaultNumberOfRetries = 10
+)
+
 // ECS parameters that are used to run jobs.
 type Service struct {
 	Cluster string `mapstructure:"CLUSTER"`
@@ -46,7 +50,7 @@ func (s *Service) loadService(ctx context.Context, svc *ecs.Client) (types.Servi
 func (s *Service) initCfg() (aws.Config, error) {
 	configFunctions := []func(*config.LoadOptions) error{
 		config.WithRetryer(func() aws.Retryer {
-			return retry.AddWithMaxAttempts(retry.NewStandard(), 10)
+			return retry.AddWithMaxAttempts(retry.NewStandard(), defaultNumberOfRetries)
 		}),
 	}
 

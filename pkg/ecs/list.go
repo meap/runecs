@@ -12,7 +12,8 @@ import (
 func (s *Service) listClusters(ctx context.Context, svc *ecs.Client) []string {
 	response, err := svc.ListClusters(ctx, &ecs.ListClustersInput{})
 	if err != nil {
-		log.Println(fmt.Errorf("failed to list clusters. (%v)", err))
+		log.Println(fmt.Errorf("failed to list clusters. (%w)", err))
+
 		return []string{}
 	}
 
@@ -25,7 +26,8 @@ func (s *Service) listServices(ctx context.Context, svc *ecs.Client, cluster str
 	})
 
 	if err != nil {
-		log.Println(fmt.Errorf("failed to list services in cluster %s. (%v)", cluster, err))
+		log.Println(fmt.Errorf("failed to list services in cluster %s. (%w)", cluster, err))
+
 		return []string{}
 	}
 
@@ -44,6 +46,7 @@ func (s *Service) List() {
 
 	svc := ecs.NewFromConfig(cfg)
 	clusters := s.listClusters(ctx, svc)
+
 	for _, clusterArn := range clusters {
 		services := s.listServices(ctx, svc, clusterArn)
 		for _, serviceArn := range services {
@@ -53,6 +56,7 @@ func (s *Service) List() {
 	}
 
 	fmt.Println()
+
 	for _, link := range links {
 		fmt.Println(link)
 	}
