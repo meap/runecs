@@ -122,6 +122,8 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 		fmt.Printf("The task definition %s is used", taskDef)
 	}
 
+	fmt.Println()
+
 	output, err := svc.RunTask(ctx, &ecs.RunTaskInput{
 		Cluster:        &s.Cluster,
 		TaskDefinition: &taskDef,
@@ -146,16 +148,18 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	}
 
 	executedTask := output.Tasks[0]
+	var lastTimestamp *int64 = nil
 
-	log.Printf("Task %s executed", *executedTask.TaskArn)
+	fmt.Printf("Task %s executed", *executedTask.TaskArn)
+	fmt.Println()
+
 	if wait {
 		for {
+			logsOutput, _ := s.printProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp)
+			lastTimestamp = &logsOutput.lastEventTimestamp
+
 			success, err := s.wait(ctx, svc, *executedTask.TaskArn)
 			if err != nil {
-				logsErr := s.printProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name)
-				if logsErr != nil {
-					log.Printf("Failed to fetch events from CloudWatch %v", logsErr)
-				}
 				log.Fatalln(err)
 			}
 
@@ -163,7 +167,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 				break
 			}
 
-			time.Sleep(6 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 
 		fmt.Printf("task %s finished", *executedTask.TaskArn)
