@@ -170,6 +170,6 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 			time.Sleep(5 * time.Second)
 		}
 
-		fmt.Printf("task %s finished", *executedTask.TaskArn)
+		fmt.Printf("task %s finished\n", *executedTask.TaskArn)
 	}
 }

@@ -55,8 +55,6 @@ func (s *Service) List() {
 		}
 	}
 
-	fmt.Println()
-
 	for _, link := range links {
 		fmt.Println(link)
 	}
