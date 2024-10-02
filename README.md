@@ -8,6 +8,10 @@ RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS C
 
 </div>
 
+<p>
+    <img src="./images/demo.gif" width="100%" alt="RunECS Example">
+</p>
+
 # Install
 
 ## 🍺 Homebrew
