@@ -39,7 +39,7 @@ func (s *Service) getFamilyPrefix(ctx context.Context, svc *ecs.Client) (string,
 	return *response.TaskDefinition.Family, nil
 }
 
-func (s *Service) latestTaskDefinition(ctx context.Context, svc *ecs.Client) (string, error) {
+func (s *Service) latestTaskDefinitionArn(ctx context.Context, svc *ecs.Client) (string, error) {
 	_, err := s.loadService(ctx, svc)
 	if err != nil {
 		return "", err
@@ -113,7 +113,7 @@ func (s *Service) printRevisions(ctx context.Context, familyPrefix string, lastR
 }
 
 func (s *Service) Revisions(lastRevisionNr int) {
-	cfg, err := s.initCfg()
+	cfg, err := initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}

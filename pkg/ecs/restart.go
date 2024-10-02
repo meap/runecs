@@ -36,7 +36,7 @@ func (s *Service) stopAll(ctx context.Context, client *ecs.Client) error {
 }
 
 func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) error {
-	taskDef, err := s.latestTaskDefinition(ctx, client)
+	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) error 
 }
 
 func (s *Service) Restart(kill bool) {
-	cfg, err := s.initCfg()
+	cfg, err := initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}

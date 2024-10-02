@@ -20,6 +20,8 @@ type taskDefinition struct {
 	Name            string
 	LogGroup        string
 	LogStreamPrefix string
+	Cpu             string
+	Memory          string
 }
 
 func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serviceDefinition, error) {
@@ -37,9 +39,7 @@ func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serv
 
 	// Fetch the latest task definition. Keep in mind that the active service may
 	// have a different task definition that is available, see. *def.TaskDefinition
-	//
-	// TODO: Define by CLI input parameter?
-	taskDef, err := s.latestTaskDefinition(ctx, client)
+	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
 	if err != nil {
 		return serviceDefinition{}, err
 	}
@@ -67,6 +67,9 @@ func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn 
 		output.LogStreamPrefix = logConfig.Options["awslogs-stream-prefix"]
 	}
 
+	output.Cpu = *resp.TaskDefinition.Cpu
+	output.Memory = *resp.TaskDefinition.Memory
+
 	return output, nil
 }
 
@@ -90,7 +93,7 @@ func (s *Service) wait(ctx context.Context, client *ecs.Client, task string) (bo
 }
 
 func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
-	cfg, err := s.initCfg()
+	cfg, err := initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -150,8 +153,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	executedTask := output.Tasks[0]
 	var lastTimestamp *int64 = nil
 
-	fmt.Printf("Task %s executed", *executedTask.TaskArn)
-	fmt.Println()
+	fmt.Printf("Task %s executed\n", *executedTask.TaskArn)
 
 	if wait {
 		for {

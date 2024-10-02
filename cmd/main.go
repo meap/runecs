@@ -171,8 +171,7 @@ func init() {
 		Short:                 "List of all services across clusters in the current region",
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			svc := initService()
-			svc.List()
+			ecs.List()
 		},
 	}
 

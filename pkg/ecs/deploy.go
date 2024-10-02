@@ -19,7 +19,7 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 
 	// Get the last task definition ARN.
 	// Load the latest task definition.
-	latestDef, err := s.latestTaskDefinition(ctx, svc)
+	latestDef, err := s.latestTaskDefinitionArn(ctx, svc)
 	if err != nil {
 		return "", err
 	}
@@ -55,7 +55,7 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 }
 
 func (s *Service) Deploy(dockerImageTag string) {
-	cfg, err := s.initCfg()
+	cfg, err := initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}

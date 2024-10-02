@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-func (s *Service) listClusters(ctx context.Context, svc *ecs.Client) []string {
+func listClusters(ctx context.Context, svc *ecs.Client) []string {
 	response, err := svc.ListClusters(ctx, &ecs.ListClustersInput{})
 	if err != nil {
 		log.Println(fmt.Errorf("failed to list clusters. (%w)", err))
@@ -20,7 +20,7 @@ func (s *Service) listClusters(ctx context.Context, svc *ecs.Client) []string {
 	return response.ClusterArns
 }
 
-func (s *Service) listServices(ctx context.Context, svc *ecs.Client, cluster string) []string {
+func listServices(ctx context.Context, svc *ecs.Client, cluster string) []string {
 	response, err := svc.ListServices(ctx, &ecs.ListServicesInput{
 		Cluster: &cluster,
 	})
@@ -34,8 +34,8 @@ func (s *Service) listServices(ctx context.Context, svc *ecs.Client, cluster str
 	return response.ServiceArns
 }
 
-func (s *Service) List() {
-	cfg, err := s.initCfg()
+func List() {
+	cfg, err := initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -45,10 +45,10 @@ func (s *Service) List() {
 	links := []string{}
 
 	svc := ecs.NewFromConfig(cfg)
-	clusters := s.listClusters(ctx, svc)
+	clusters := listClusters(ctx, svc)
 
 	for _, clusterArn := range clusters {
-		services := s.listServices(ctx, svc, clusterArn)
+		services := listServices(ctx, svc, clusterArn)
 		for _, serviceArn := range services {
 			parts := strings.Split(serviceArn, "/")
 			links = append(links, fmt.Sprintf("%s/%s", parts[1], parts[2]))

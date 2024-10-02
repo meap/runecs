@@ -88,7 +88,7 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 }
 
 func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) {
-	cfg, err := s.initCfg()
+	cfg, err := initCfg()
 	if err != nil {
 		log.Fatalln(err)
 	}

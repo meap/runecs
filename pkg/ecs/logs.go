@@ -19,7 +19,7 @@ func (s *Service) printProcessLogs(
 	name string,
 	startTime *int64) (printProcessLogsOutput, error) {
 
-	cfg, err := s.initCfg()
+	cfg, err := initCfg()
 	if err != nil {
 		return printProcessLogsOutput{}, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
 	}

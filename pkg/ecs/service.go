@@ -47,7 +47,7 @@ func (s *Service) loadService(ctx context.Context, svc *ecs.Client) (types.Servi
 	return response.Services[0], nil
 }
 
-func (s *Service) initCfg() (aws.Config, error) {
+func initCfg() (aws.Config, error) {
 	configFunctions := []func(*config.LoadOptions) error{
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithMaxAttempts(retry.NewStandard(), defaultNumberOfRetries)
