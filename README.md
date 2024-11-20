@@ -85,6 +85,12 @@ The main parameter is the name of the ECS service within which the command is to
 runecs list
 ```
 
+To include the tasks of each service in the output, use the `--all` parameter. This will display the tasks currently running in each service.
+
+```shell
+runecs list --all
+```
+
 ### Restart
 
 Restarts all running tasks in the service.
