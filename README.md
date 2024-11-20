@@ -4,6 +4,9 @@
 
 # RunECS CLI
 
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/meap/runecs?logo=GitHub)](https://github.com/meap/runecs/releases)
+[![GitHub all releases](https://img.shields.io/github/downloads/meap/runecs/total?label=all%20time%20downloads)](https://github.com/meap/runecs/releases/)
+
 RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster.
 
 </div>
