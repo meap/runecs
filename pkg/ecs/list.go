@@ -74,9 +74,11 @@ func listTasks(ctx context.Context, svc *ecs.Client, cluster string, service str
 			runningTime = "Unknown"
 		}
 
+		taskID := extractLastPart(*task.TaskArn)
+
 		output = append(output, fmt.Sprintf(
 			"%s: %s (Cpu) / %s (Memory) (Running for: %s)",
-			*task.TaskArn,
+			taskID,
 			*task.Cpu,
 			*task.Memory,
 			runningTime,

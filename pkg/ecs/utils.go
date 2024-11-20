@@ -10,3 +10,9 @@ func extractProcessID(taskArn string) string {
 
 	return taskArn
 }
+
+func extractLastPart(arn string) string {
+	parts := strings.Split(arn, "/")
+
+	return parts[len(parts)-1]
+}
