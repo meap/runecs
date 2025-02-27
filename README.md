@@ -2,18 +2,22 @@
 
 <img width="106px" alt="elastic container service logo" src="images/amazon_ecs-icon.svg">
 
-# RunECS CLI
+# RunECS CLI - Simplified AWS ECS Run Task Wrapper
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/meap/runecs?logo=GitHub)](https://github.com/meap/runecs/releases)
 [![GitHub all releases](https://img.shields.io/github/downloads/meap/runecs/total?label=all%20time%20downloads)](https://github.com/meap/runecs/releases/)
 
-RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster.
+RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster. A developer-friendly wrapper for the AWS ECS run task command.
 
 </div>
 
 <p>
-    <img src="./images/demo.gif" width="100%" alt="RunECS Example">
+    <img src="./images/demo.gif" width="100%" alt="RunECS - Simplified AWS ECS run task demonstration">
 </p>
+
+## What is RunECS?
+
+RunECS is a command-line tool that simplifies running one-off tasks in Amazon ECS (Elastic Container Service). It wraps the standard `aws ecs run-task` command functionality with a more developer-friendly interface, providing intuitive commands for common ECS operations while leveraging AWS's underlying infrastructure.
 
 # Install
 
@@ -45,7 +49,7 @@ Download the binary file for your platform, [see releases](https://github.com/me
 
 # How to Use
 
-RunECS executes the command using the specified service. The service must be specified in `cluster/service` format. Further, you must specify the environment variables that determine access to AWS.
+RunECS simplifies the process of executing commands using AWS ECS run task functionality. The service must be specified in `cluster/service` format. Further, you must specify the environment variables that determine access to AWS.
 
 ```
 export AWS_ACCESS_KEY_ID=xxxxxx
@@ -57,9 +61,9 @@ runecs rake orders:upload[14021] --service my-cluster/my-service -w
 
 ## Commands
 
-### Run
+### Run (AWS ECS Run Task Made Simple)
 
-Executes the process using the last available task definition. You can pick a specific docker tag by using the `--image-tag` argument. In this case, it changes the task definition and inserts the specified docker tag. 
+The `run` command is a streamlined wrapper around the AWS ECS run task API. It executes the process using the last available task definition. You can pick a specific docker tag by using the `--image-tag` argument. In this case, it changes the task definition and inserts the specified docker tag. 
 
 The task is run asynchronously by default. Using the `--wait` argument, the task starts synchronously and returns the EXIT code of the container.
 
@@ -69,7 +73,7 @@ Executing a one-off process asynchronously:
 runecs run rake db:migrate \
   --service my-cluster/my-service \
   --image-tag latest
-````
+```
 
 Executing a one-off process synchronously:
 
