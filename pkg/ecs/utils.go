@@ -4,21 +4,26 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 )
 
-func extractProcessID(taskArn string) string {
-	lastSlashIndex := strings.LastIndex(taskArn, "/")
-	if lastSlashIndex != -1 {
-		return taskArn[lastSlashIndex+1:]
+// extractARNResource extracts the resource identifier from an AWS ARN
+// using the official AWS SDK ARN parser
+func extractARNResource(arnString string) (string, error) {
+	parsedARN, err := arn.Parse(arnString)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse ARN %q: %w", arnString, err)
 	}
 
-	return taskArn
-}
+	// Extract the resource ID from the Resource field
+	// For resources like "task/abc123" or "user/David", get the part after "/"
+	if idx := strings.LastIndex(parsedARN.Resource, "/"); idx != -1 {
+		return parsedARN.Resource[idx+1:], nil
+	}
 
-func extractLastPart(arn string) string {
-	parts := strings.Split(arn, "/")
-
-	return parts[len(parts)-1]
+	// If no "/" in resource, return the whole resource
+	return parsedARN.Resource, nil
 }
 
 // formatRunningTime formats a duration into a human-readable string.

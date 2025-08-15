@@ -384,7 +384,10 @@ func getProcessLogs(
 		return nil, 0, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
 	}
 
-	processID := extractProcessID(taskArn)
+	processID, err := extractARNResource(taskArn)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to extract process ID from task ARN: %w", err)
+	}
 	client := cloudwatchlogs.NewFromConfig(cfg)
 
 	input := &cloudwatchlogs.FilterLogEventsInput{

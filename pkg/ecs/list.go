@@ -83,7 +83,10 @@ func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, servic
 			runningTime = "Unknown"
 		}
 
-		taskID := extractLastPart(*task.TaskArn)
+		taskID, err := extractARNResource(*task.TaskArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract task ID from ARN: %w", err)
+		}
 
 		tasks = append(tasks, TaskInfo{
 			ID:          taskID,
