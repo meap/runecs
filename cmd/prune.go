@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -36,22 +37,25 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 	fmt.Printf("Processing %d task definition families: %v\n", len(result.Families), result.Families)
 	fmt.Println()
 
+	// Create lipgloss style for ARN formatting
+	arnStyle := lipgloss.NewStyle().Bold(true)
+
 	// Display detailed task actions
 	for _, task := range result.ProcessedTasks {
 		switch task.Action {
 		case "kept":
 			fmt.Printf("Task definition %s created %d days ago was skipped (%s)\n",
-				task.Arn, task.DaysOld, task.Reason)
+				arnStyle.Render(task.Arn), task.DaysOld, task.Reason)
 		case "deleted":
 			if result.DryRun {
 				fmt.Printf("Task definition %s created %d days ago would be deregistered\n",
-					task.Arn, task.DaysOld)
+					arnStyle.Render(task.Arn), task.DaysOld)
 			} else {
 				fmt.Printf("Task definition %s created %d days ago was deregistered\n",
-					task.Arn, task.DaysOld)
+					arnStyle.Render(task.Arn), task.DaysOld)
 			}
 		case "skipped":
-			fmt.Printf("Task definition %s skipped: %s\n", task.Arn, task.Reason)
+			fmt.Printf("Task definition %s skipped: %s\n", arnStyle.Render(task.Arn), task.Reason)
 		}
 	}
 
