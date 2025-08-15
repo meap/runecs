@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -41,12 +42,23 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 
 	// Create lipgloss style for date formatting
 	dateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	boldStyle := lipgloss.NewStyle().Bold(true)
 
-	// Print bullet list with created date and docker URI
+	// Print revisions line by line
 	for _, revision := range result.Revisions {
 		// Use proper Go time formatting for date and time without seconds
 		formattedDate := dateStyle.Render(revision.CreatedAt.Local().Format(time.DateTime)[:16])
-		fmt.Printf("• %s: %s\n", formattedDate, revision.DockerURI)
+		
+		// Split DockerURI to extract and style the tag
+		dockerParts := strings.Split(revision.DockerURI, ":")
+		if len(dockerParts) >= 2 {
+			repo := strings.Join(dockerParts[:len(dockerParts)-1], ":")
+			tag := dockerParts[len(dockerParts)-1]
+			styledTag := boldStyle.Render(tag)
+			fmt.Printf("%s: %s:%s\n", formattedDate, repo, styledTag)
+		} else {
+			fmt.Printf("%s: %s\n", formattedDate, revision.DockerURI)
+		}
 	}
 }
 
