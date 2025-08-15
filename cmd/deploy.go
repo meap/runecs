@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -33,7 +35,13 @@ func deployPreRunE(dockerImageTag *string) func(*cobra.Command, []string) error 
 func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		svc := initService()
-		svc.Deploy(*dockerImageTag)
+		result, err := svc.Deploy(*dockerImageTag)
+		if err != nil {
+			log.Fatalf("Deploy failed: %v\n", err)
+		}
+
+		fmt.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
+		fmt.Printf("Service %s has been updated.\n", result.ServiceArn)
 	}
 }
 

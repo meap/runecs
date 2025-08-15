@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"log"
+
+	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +24,20 @@ func restartHandler(cmd *cobra.Command, args []string) {
 	kill, _ := cmd.Flags().GetBool("kill")
 
 	svc := initService()
-	svc.Restart(kill)
+	result, err := svc.Restart(kill)
+	if err != nil {
+		log.Fatalf("Restart failed: %v\n", err)
+	}
+
+	if result.Method == "kill" {
+		for _, stoppedTask := range result.StoppedTasks {
+			fmt.Printf("Stopped task %s started %s\n", stoppedTask.TaskArn, humanize.Time(stoppedTask.StartedAt))
+		}
+	} else {
+		fmt.Printf("Service %s restarted by starting new tasks using task definition %s.\n", svc.Service, result.TaskDefinition)
+	}
+
+	fmt.Println("Done.")
 }
 
 func init() {

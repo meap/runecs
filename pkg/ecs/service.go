@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -28,7 +27,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/dustin/go-humanize"
 	"github.com/jinzhu/copier"
 )
 
@@ -81,6 +79,23 @@ type RevisionEntry struct {
 
 type RevisionsResult struct {
 	Revisions []RevisionEntry
+}
+
+type DeployResult struct {
+	TaskDefinitionArn string
+	ServiceArn        string
+}
+
+type RestartResult struct {
+	StoppedTasks   []StoppedTaskInfo
+	ServiceArn     string
+	TaskDefinition string
+	Method         string // "kill" or "force_deploy"
+}
+
+type StoppedTaskInfo struct {
+	TaskArn   string
+	StartedAt time.Time
 }
 
 type TaskDefinitionPruneEntry struct {
@@ -181,10 +196,10 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 	return *output.TaskDefinition.TaskDefinitionArn, nil
 }
 
-func (s *Service) Deploy(dockerImageTag string) {
+func (s *Service) Deploy(dockerImageTag string) (*DeployResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
-		log.Fatalln(err)
+		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
 	}
 
 	ctx := context.Background()
@@ -194,10 +209,8 @@ func (s *Service) Deploy(dockerImageTag string) {
 	// Clones the latest version of the task definition and inserts the new Docker URI.
 	TaskDefinitionArn, err := s.cloneTaskDef(ctx, dockerImageTag, svc)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, fmt.Errorf("failed to clone task definition: %w", err)
 	}
-
-	fmt.Printf("New task revision %s has been created\n", TaskDefinitionArn)
 
 	updateOutput, err := svc.UpdateService(ctx, &ecs.UpdateServiceInput{
 		Cluster:        &s.Cluster,
@@ -206,10 +219,13 @@ func (s *Service) Deploy(dockerImageTag string) {
 	})
 
 	if err != nil {
-		log.Fatalln(err)
+		return nil, fmt.Errorf("failed to update service: %w", err)
 	}
 
-	fmt.Printf("Service %s has been updated.\n", *updateOutput.Service.ServiceArn)
+	return &DeployResult{
+		TaskDefinitionArn: TaskDefinitionArn,
+		ServiceArn:        *updateOutput.Service.ServiceArn,
+	}, nil
 }
 
 // =============================================================================
@@ -595,36 +611,39 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) (*PruneResult, 
 // Restart Methods
 // =============================================================================
 
-func (s *Service) stopAll(ctx context.Context, client *ecs.Client) error {
+func (s *Service) stopAll(ctx context.Context, client *ecs.Client) ([]StoppedTaskInfo, error) {
 	tasks, err := client.ListTasks(ctx, &ecs.ListTasksInput{
 		Cluster:     &s.Cluster,
 		ServiceName: &s.Service,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var stoppedTasks []StoppedTaskInfo
 	for _, taskArn := range tasks.TaskArns {
 		output, err := client.StopTask(ctx, &ecs.StopTaskInput{
 			Cluster: &s.Cluster,
 			Task:    &taskArn,
 		})
 		if err != nil {
-			log.Println(fmt.Errorf("failed to stop task %s. (%w)", taskArn, err))
-
+			// Continue with other tasks but log this error
 			continue
 		}
 
-		fmt.Printf("Stopped task %s started %s\n", *output.Task.TaskArn, humanize.Time(*output.Task.StartedAt))
+		stoppedTasks = append(stoppedTasks, StoppedTaskInfo{
+			TaskArn:   *output.Task.TaskArn,
+			StartedAt: *output.Task.StartedAt,
+		})
 	}
 
-	return nil
+	return stoppedTasks, nil
 }
 
-func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) error {
+func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) (string, string, error) {
 	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	output, err := client.UpdateService(ctx, &ecs.UpdateServiceInput{
@@ -635,34 +654,41 @@ func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) error 
 	})
 
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	fmt.Printf("Service %s restarted by starting new tasks using task definition %s.\n", s.Service, *output.Service.TaskDefinition)
-
-	return nil
+	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
 }
 
-func (s *Service) Restart(kill bool) {
+func (s *Service) Restart(kill bool) (*RestartResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
-		log.Fatalln(err)
+		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
 	}
 
+	ctx := context.Background()
 	svc := ecs.NewFromConfig(cfg)
+
+	result := &RestartResult{}
+
 	if kill {
-		err := s.stopAll(context.Background(), svc)
+		result.Method = "kill"
+		stoppedTasks, err := s.stopAll(ctx, svc)
 		if err != nil {
-			log.Fatalln(err)
+			return nil, fmt.Errorf("failed to stop tasks: %w", err)
 		}
+		result.StoppedTasks = stoppedTasks
 	} else {
-		err := s.forceNewDeploy(context.Background(), svc)
+		result.Method = "force_deploy"
+		serviceArn, taskDefinition, err := s.forceNewDeploy(ctx, svc)
 		if err != nil {
-			log.Fatalln(err)
+			return nil, fmt.Errorf("failed to force new deployment: %w", err)
 		}
+		result.ServiceArn = serviceArn
+		result.TaskDefinition = taskDefinition
 	}
 
-	fmt.Println("Done.")
+	return result, nil
 }
 
 // =============================================================================
