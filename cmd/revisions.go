@@ -41,7 +41,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 
 	// Create lipgloss style for date formatting
 	dateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	
+
 	// Print bullet list with created date and docker URI
 	for _, revision := range result.Revisions {
 		// Use proper Go time formatting for date and time without seconds

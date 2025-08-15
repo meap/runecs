@@ -78,7 +78,7 @@ func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, servic
 		var runningTime string
 		if task.StartedAt != nil {
 			duration := time.Since(*task.StartedAt)
-			runningTime = fmt.Sprintf("%dh %dm %ds", int(duration.Hours()), int(duration.Minutes())%60, int(duration.Seconds())%60)
+			runningTime = formatRunningTime(duration)
 		} else {
 			runningTime = "Unknown"
 		}
