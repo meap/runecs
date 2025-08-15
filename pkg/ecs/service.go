@@ -154,12 +154,21 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 		return "", errors.New("multiple container definitions in a single task are not supported")
 	}
 
+	containerDef, err := safeGetFirstPtr(response.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	if err != nil {
+		return "", fmt.Errorf("failed to get container definition: %w", err)
+	}
+
 	newDef := &ecs.RegisterTaskDefinitionInput{}
 	if err := copier.Copy(newDef, response.TaskDefinition); err != nil {
 		return "", err
 	}
 
-	split := strings.Split(*newDef.ContainerDefinitions[0].Image, ":")
+	if containerDef.Image == nil {
+		return "", errors.New("container definition has no image specified")
+	}
+
+	split := strings.Split(*containerDef.Image, ":")
 	newDockerURI := fmt.Sprintf("%s:%s", split[0], dockerImageTag)
 
 	newDef.ContainerDefinitions[0].Image = &newDockerURI
@@ -167,6 +176,10 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 	output, err := svc.RegisterTaskDefinition(ctx, newDef)
 	if err != nil {
 		return "", err
+	}
+
+	if output.TaskDefinition == nil || output.TaskDefinition.TaskDefinitionArn == nil {
+		return "", errors.New("invalid task definition response: missing ARN")
 	}
 
 	return *output.TaskDefinition.TaskDefinitionArn, nil
@@ -198,6 +211,10 @@ func Deploy(cluster, service, dockerImageTag string) (*DeployResult, error) {
 		return nil, fmt.Errorf("failed to update service: %w", err)
 	}
 
+	if updateOutput.Service == nil || updateOutput.Service.ServiceArn == nil {
+		return nil, errors.New("invalid service update response: missing service ARN")
+	}
+
 	return &DeployResult{
 		TaskDefinitionArn: TaskDefinitionArn,
 		ServiceArn:        *updateOutput.Service.ServiceArn,
@@ -218,36 +235,62 @@ func describeService(ctx context.Context, cluster, service string, client *ecs.C
 		return ServiceDefinition{}, err
 	}
 
-	def := resp.Services[0]
+	serviceInfo, err := safeGetFirstPtr(resp.Services, "no services found in response")
+	if err != nil {
+		return ServiceDefinition{}, fmt.Errorf("failed to get service information: %w", err)
+	}
 
 	// Fetch the latest task definition. Keep in mind that the active service may
-	// have a different task definition that is available, see. *def.TaskDefinition
+	// have a different task definition that is available, see. *serviceInfo.TaskDefinition
 	taskDef, err := latestTaskDefinitionArn(ctx, cluster, service, client)
 	if err != nil {
 		return ServiceDefinition{}, err
 	}
 
+	// Check for required network configuration
+	if serviceInfo.NetworkConfiguration == nil {
+		return ServiceDefinition{}, errors.New("service has no network configuration")
+	}
+	if serviceInfo.NetworkConfiguration.AwsvpcConfiguration == nil {
+		return ServiceDefinition{}, errors.New("service has no AWSVPC configuration")
+	}
+
 	return ServiceDefinition{
-		Subnets:        def.NetworkConfiguration.AwsvpcConfiguration.Subnets,
-		SecurityGroups: def.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
+		Subnets:        serviceInfo.NetworkConfiguration.AwsvpcConfiguration.Subnets,
+		SecurityGroups: serviceInfo.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
 		TaskDef:        taskDef,
 	}, nil
 }
 
 func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
-	resp, _ := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
+	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
+	if err != nil {
+		return TaskDefinition{}, err
+	}
 
-	if len(resp.TaskDefinition.ContainerDefinitions) == 0 {
-		return TaskDefinition{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
+	containerDef, err := safeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	if err != nil {
+		return TaskDefinition{}, fmt.Errorf("failed to get container definition from task %s: %w", *taskArn, err)
+	}
+
+	if containerDef.Name == nil {
+		return TaskDefinition{}, fmt.Errorf("container definition has no name in task %s", *taskArn)
 	}
 
 	output := TaskDefinition{}
-	output.Name = *resp.TaskDefinition.ContainerDefinitions[0].Name
+	output.Name = *containerDef.Name
 
-	logConfig := resp.TaskDefinition.ContainerDefinitions[0].LogConfiguration
+	logConfig := containerDef.LogConfiguration
 	if logConfig != nil && logConfig.LogDriver == types.LogDriverAwslogs {
 		output.LogGroup = logConfig.Options["awslogs-group"]
 		output.LogStreamPrefix = logConfig.Options["awslogs-stream-prefix"]
+	}
+
+	if resp.TaskDefinition.Cpu == nil {
+		return TaskDefinition{}, fmt.Errorf("task definition has no CPU specification: %s", *taskArn)
+	}
+	if resp.TaskDefinition.Memory == nil {
+		return TaskDefinition{}, fmt.Errorf("task definition has no memory specification: %s", *taskArn)
 	}
 
 	output.Cpu = *resp.TaskDefinition.Cpu
@@ -266,13 +309,35 @@ func wait(ctx context.Context, cluster string, client *ecs.Client, task string) 
 		return false, err
 	}
 
-	if *output.Tasks[0].LastStatus == "STOPPED" {
-		if exitCode := *output.Tasks[0].Containers[0].ExitCode; exitCode != 0 {
-			return true, fmt.Errorf("task %s failed with exit code %d", *output.Tasks[0].TaskArn, exitCode)
+	taskInfo, err := safeGetFirstPtr(output.Tasks, "no tasks found in response")
+	if err != nil {
+		return false, fmt.Errorf("failed to get task information: %w", err)
+	}
+
+	if taskInfo.LastStatus == nil {
+		return false, errors.New("task has no status information")
+	}
+
+	if *taskInfo.LastStatus == "STOPPED" {
+		container, err := safeGetFirstPtr(taskInfo.Containers, "no containers found in task")
+		if err != nil {
+			return false, fmt.Errorf("failed to get container information: %w", err)
+		}
+
+		if container.ExitCode == nil {
+			return false, errors.New("stopped container has no exit code")
+		}
+
+		if taskInfo.TaskArn == nil {
+			return false, errors.New("task has no ARN")
+		}
+
+		if exitCode := *container.ExitCode; exitCode != 0 {
+			return true, fmt.Errorf("task %s failed with exit code %d", *taskInfo.TaskArn, exitCode)
 		}
 	}
 
-	return *output.Tasks[0].LastStatus == "STOPPED", nil
+	return *taskInfo.LastStatus == "STOPPED", nil
 }
 
 func Execute(cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
@@ -332,7 +397,15 @@ func Execute(cluster, service string, cmd []string, waitForCompletion bool, dock
 		return nil, err
 	}
 
-	executedTask := output.Tasks[0]
+	executedTask, err := safeGetFirstPtr(output.Tasks, "no tasks found in response")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get executed task: %w", err)
+	}
+
+	if executedTask.TaskArn == nil {
+		return nil, errors.New("executed task has no ARN")
+	}
+
 	result := &ExecuteResult{
 		ServiceName:       service,
 		TaskDefinition:    taskDef,
@@ -403,6 +476,9 @@ func getProcessLogs(
 
 	var logs []LogEntry
 	for _, event := range output.Events {
+		if event.LogStreamName == nil || event.Message == nil || event.Timestamp == nil {
+			continue // Skip events with missing required fields
+		}
 		logs = append(logs, LogEntry{
 			StreamName: *event.LogStreamName,
 			Message:    *event.Message,
@@ -412,7 +488,16 @@ func getProcessLogs(
 
 	var lastEventTimestamp int64
 	if len(output.Events) > 0 {
-		lastEventTimestamp = *output.Events[len(output.Events)-1].Timestamp + 1
+		lastEvent := output.Events[len(output.Events)-1]
+		if lastEvent.Timestamp == nil {
+			if startTime != nil {
+				lastEventTimestamp = *startTime
+			} else {
+				lastEventTimestamp = 0
+			}
+		} else {
+			lastEventTimestamp = *lastEvent.Timestamp + 1
+		}
 	} else if startTime != nil {
 		lastEventTimestamp = *startTime
 	} else {
@@ -458,6 +543,17 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 					DaysOld: -1,
 					Action:  "skipped",
 					Reason:  fmt.Sprintf("Failed to describe: %v", err),
+					Family:  family,
+				})
+				continue
+			}
+
+			if response.TaskDefinition.RegisteredAt == nil {
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: -1,
+					Action:  "skipped",
+					Reason:  "Missing registration date",
 					Family:  family,
 				})
 				continue
@@ -606,6 +702,14 @@ func stopAll(ctx context.Context, cluster, service string, client *ecs.Client) (
 			continue
 		}
 
+		if output.Task == nil {
+			continue
+		}
+
+		if output.Task.TaskArn == nil || output.Task.StartedAt == nil {
+			continue
+		}
+
 		stoppedTasks = append(stoppedTasks, StoppedTaskInfo{
 			TaskArn:   *output.Task.TaskArn,
 			StartedAt: *output.Task.StartedAt,
@@ -630,6 +734,18 @@ func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Cl
 
 	if err != nil {
 		return "", "", err
+	}
+
+	if output.Service == nil {
+		return "", "", errors.New("invalid service update response: missing service")
+	}
+
+	if output.Service.ServiceArn == nil {
+		return "", "", errors.New("invalid service update response: missing service ARN")
+	}
+
+	if output.Service.TaskDefinition == nil {
+		return "", "", errors.New("invalid service update response: missing task definition")
 	}
 
 	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
@@ -691,13 +807,21 @@ func getFamilyPrefix(ctx context.Context, cluster, service string, svc *ecs.Clie
 		return "", err
 	}
 
-	serviceInfo := serviceResponse.Services[0]
+	serviceInfo, err := safeGetFirstPtr(serviceResponse.Services, "no services found in response")
+	if err != nil {
+		return "", fmt.Errorf("failed to get service information: %w", err)
+	}
+
 	response, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: serviceInfo.TaskDefinition,
 	})
 
 	if err != nil {
 		return "", err
+	}
+
+	if response.TaskDefinition.Family == nil {
+		return "", errors.New("task definition has no family name")
 	}
 
 	return *response.TaskDefinition.Family, nil
@@ -718,7 +842,12 @@ func latestTaskDefinitionArn(ctx context.Context, cluster, service string, svc *
 		return "", err
 	}
 
-	return response.TaskDefinitionArns[0], nil
+	arn, err := safeGetFirst(response.TaskDefinitionArns, "no task definition ARNs found in response")
+	if err != nil {
+		return "", fmt.Errorf("failed to get task definition ARN: %w", err)
+	}
+
+	return arn, nil
 }
 
 func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int, svc *ecs.Client) ([]RevisionEntry, error) {
@@ -751,10 +880,23 @@ func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int,
 				continue
 			}
 
+			if resp.TaskDefinition.RegisteredAt == nil {
+				continue // Skip revisions without registration date
+			}
+
+			containerDef, err := safeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+			if err != nil {
+				continue // Skip revisions without container definitions
+			}
+
+			if containerDef.Image == nil {
+				continue // Skip revisions without image
+			}
+
 			revisions = append(revisions, RevisionEntry{
 				Revision:  resp.TaskDefinition.Revision,
 				CreatedAt: *resp.TaskDefinition.RegisteredAt,
-				DockerURI: *resp.TaskDefinition.ContainerDefinitions[0].Image,
+				DockerURI: *containerDef.Image,
 				Family:    familyPrefix,
 			})
 			total++
