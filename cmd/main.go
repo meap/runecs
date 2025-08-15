@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,12 +36,8 @@ var rootCmd = &cobra.Command{
 		serviceValue := cmd.Flag("service").Value.String()
 
 		serviceRequired := true
-		for _, c := range commandsWithoutService {
-			if cmd.Name() == c {
-				serviceRequired = false
-
-				break
-			}
+		if slices.Contains(commandsWithoutService, cmd.Name()) {
+			serviceRequired = false
 		}
 
 		if serviceRequired && serviceValue == "" {
