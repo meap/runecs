@@ -95,6 +95,10 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo) {
 			if row == table.HeaderRow {
 				return headerStyle
 			}
+			// Right-align CPU (col 2), Memory (col 3), and Running Time (col 4) columns
+			if col == 2 || col == 3 || col == 4 {
+				return cellStyle.Align(lipgloss.Right)
+			}
 			return cellStyle
 		}).
 		Headers("Service", "Task ID", "CPU", "Memory", "Running Time").
