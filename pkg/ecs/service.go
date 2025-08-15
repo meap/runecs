@@ -45,13 +45,13 @@ type Service struct {
 }
 
 // Local types used by Service methods
-type serviceDefinition struct {
+type ServiceDefinition struct {
 	Subnets        []string
 	SecurityGroups []string
 	TaskDef        string
 }
 
-type taskDefinition struct {
+type TaskDefinition struct {
 	Name            string
 	LogGroup        string
 	LogStreamPrefix string
@@ -59,7 +59,7 @@ type taskDefinition struct {
 	Memory          string
 }
 
-type printProcessLogsOutput struct {
+type PrintProcessLogsOutput struct {
 	lastEventTimestamp int64
 }
 
@@ -154,17 +154,17 @@ func (s *Service) Deploy(dockerImageTag string) {
 	svc := ecs.NewFromConfig(cfg)
 
 	// Clones the latest version of the task definition and inserts the new Docker URI.
-	taskDefinitionArn, err := s.cloneTaskDef(ctx, dockerImageTag, svc)
+	TaskDefinitionArn, err := s.cloneTaskDef(ctx, dockerImageTag, svc)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	fmt.Printf("New revision of the task %s has been created\n", taskDefinitionArn)
+	fmt.Printf("New revision of the task %s has been created\n", TaskDefinitionArn)
 
 	updateOutput, err := svc.UpdateService(ctx, &ecs.UpdateServiceInput{
 		Cluster:        &s.Cluster,
 		Service:        &s.Service,
-		TaskDefinition: &taskDefinitionArn,
+		TaskDefinition: &TaskDefinitionArn,
 	})
 
 	if err != nil {
@@ -178,14 +178,14 @@ func (s *Service) Deploy(dockerImageTag string) {
 // Execute Methods
 // =============================================================================
 
-func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serviceDefinition, error) {
+func (s *Service) describeService(ctx context.Context, client *ecs.Client) (ServiceDefinition, error) {
 	resp, err := client.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster:  &s.Cluster,
 		Services: []string{s.Service},
 	})
 
 	if err != nil {
-		return serviceDefinition{}, err
+		return ServiceDefinition{}, err
 	}
 
 	def := resp.Services[0]
@@ -195,24 +195,24 @@ func (s *Service) describeService(ctx context.Context, client *ecs.Client) (serv
 	// have a different task definition that is available, see. *def.TaskDefinition
 	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
 	if err != nil {
-		return serviceDefinition{}, err
+		return ServiceDefinition{}, err
 	}
 
-	return serviceDefinition{
+	return ServiceDefinition{
 		Subnets:        def.NetworkConfiguration.AwsvpcConfiguration.Subnets,
 		SecurityGroups: def.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
 		TaskDef:        taskDef,
 	}, nil
 }
 
-func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (taskDefinition, error) {
+func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
 	resp, _ := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 
 	if len(resp.TaskDefinition.ContainerDefinitions) == 0 {
-		return taskDefinition{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
+		return TaskDefinition{}, fmt.Errorf("no container definitions found in task definition %s", *taskArn)
 	}
 
-	output := taskDefinition{}
+	output := TaskDefinition{}
 	output.Name = *resp.TaskDefinition.ContainerDefinitions[0].Name
 
 	logConfig := resp.TaskDefinition.ContainerDefinitions[0].LogConfiguration
@@ -339,11 +339,11 @@ func (s *Service) printProcessLogs(
 	logStreamPrefix string,
 	taskArn string,
 	name string,
-	startTime *int64) (printProcessLogsOutput, error) {
+	startTime *int64) (PrintProcessLogsOutput, error) {
 
 	cfg, err := initCfg()
 	if err != nil {
-		return printProcessLogsOutput{}, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
+		return PrintProcessLogsOutput{}, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
 	}
 
 	processID := extractProcessID(taskArn)
@@ -361,7 +361,7 @@ func (s *Service) printProcessLogs(
 	output, err := client.FilterLogEvents(ctx, input)
 
 	if err != nil {
-		return printProcessLogsOutput{}, fmt.Errorf("failed to filter log events (%w)", err)
+		return PrintProcessLogsOutput{}, fmt.Errorf("failed to filter log events (%w)", err)
 	}
 
 	for _, event := range output.Events {
@@ -377,7 +377,7 @@ func (s *Service) printProcessLogs(
 		lastEventTimestamp = 0
 	}
 
-	return printProcessLogsOutput{
+	return PrintProcessLogsOutput{
 		lastEventTimestamp: lastEventTimestamp,
 	}, nil
 }
