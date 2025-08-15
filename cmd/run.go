@@ -22,7 +22,7 @@ func newRunCommand() *cobra.Command {
 		Run:                   runHandler(&dockerImageTag, &execWait),
 	}
 
-	cmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
+	cmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for task to finish")
 	cmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
 	return cmd
 }
@@ -41,9 +41,9 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 
 		// Display task definition information
 		if result.NewTaskDefCreated {
-			fmt.Printf("New task definition %s is created\n", result.TaskDefinition)
+			fmt.Printf("New task definition %s created\n", result.TaskDefinition)
 		} else {
-			fmt.Printf("The task definition %s is used\n", result.TaskDefinition)
+			fmt.Printf("Using task definition %s\n", result.TaskDefinition)
 		}
 
 		fmt.Println()
@@ -58,7 +58,7 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 			}
 
 			if result.Finished {
-				fmt.Printf("task %s finished\n", result.TaskArn)
+				fmt.Printf("Task %s finished\n", result.TaskArn)
 			}
 		}
 	}

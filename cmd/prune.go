@@ -40,14 +40,14 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 	for _, task := range result.ProcessedTasks {
 		switch task.Action {
 		case "kept":
-			fmt.Printf("Task definition %s created %d days ago is skipped (%s)\n",
+			fmt.Printf("Task definition %s created %d days ago was skipped (%s)\n",
 				task.Arn, task.DaysOld, task.Reason)
 		case "deleted":
 			if result.DryRun {
 				fmt.Printf("Task definition %s created %d days ago would be deregistered\n",
 					task.Arn, task.DaysOld)
 			} else {
-				fmt.Printf("Task definition %s created %d days ago is deregistered\n",
+				fmt.Printf("Task definition %s created %d days ago was deregistered\n",
 					task.Arn, task.DaysOld)
 			}
 		case "skipped":

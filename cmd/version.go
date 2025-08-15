@@ -17,7 +17,7 @@ var version *Version
 func newVersionCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "print the version number and exit",
+		Short: "Print the version number and exit",
 		Run:   versionHandler,
 	}
 }

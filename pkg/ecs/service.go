@@ -197,7 +197,7 @@ func (s *Service) Deploy(dockerImageTag string) {
 		log.Fatalln(err)
 	}
 
-	fmt.Printf("New revision of the task %s has been created\n", TaskDefinitionArn)
+	fmt.Printf("New task revision %s has been created\n", TaskDefinitionArn)
 
 	updateOutput, err := svc.UpdateService(ctx, &ecs.UpdateServiceInput{
 		Cluster:        &s.Cluster,
@@ -638,7 +638,7 @@ func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) error 
 		return err
 	}
 
-	fmt.Printf("Service %s restarted by starting new tasks using the task definition %s.\n", s.Service, *output.Service.TaskDefinition)
+	fmt.Printf("Service %s restarted by starting new tasks using task definition %s.\n", s.Service, *output.Service.TaskDefinition)
 
 	return nil
 }

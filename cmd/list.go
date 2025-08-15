@@ -10,12 +10,12 @@ import (
 func newListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "list",
-		Short:                 "List of all services across clusters in the current region",
+		Short:                 "List all services across clusters in the current region",
 		DisableFlagsInUseLine: true,
 		RunE:                  listHandler,
 	}
 
-	cmd.PersistentFlags().BoolP("all", "a", false, "list including running tasks")
+	cmd.PersistentFlags().BoolP("all", "a", false, "include running tasks in output")
 	return cmd
 }
 
@@ -33,7 +33,7 @@ func listHandler(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s/%s\n", service.ClusterName, service.Name)
 			if all {
 				for _, task := range service.Tasks {
-					fmt.Printf("  %s: %s (Cpu) / %s (Memory) (Running for: %s)\n",
+					fmt.Printf("  %s: %s (CPU) / %s (Memory) (Running for: %s)\n",
 						task.ID,
 						task.CPU,
 						task.Memory,

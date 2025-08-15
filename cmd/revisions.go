@@ -14,7 +14,7 @@ import (
 func newRevisionsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "revisions",
-		Short:                 "List of active task definitions",
+		Short:                 "List active task definitions",
 		DisableFlagsInUseLine: true,
 		Run:                   revisionsHandler,
 	}
