@@ -49,7 +49,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 	for _, revision := range result.Revisions {
 		// Use proper Go time formatting for date and time without seconds
 		formattedDate := dateStyle.Render(revision.CreatedAt.Local().Format(time.DateTime)[:16])
-		
+
 		// Split DockerURI to extract and style the tag
 		dockerParts := strings.Split(revision.DockerURI, ":")
 		if len(dockerParts) >= 2 {

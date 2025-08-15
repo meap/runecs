@@ -34,7 +34,6 @@ const (
 	defaultNumberOfRetries = 10
 )
 
-
 // Local types used by ECS functions
 type ServiceDefinition struct {
 	Subnets        []string
@@ -114,7 +113,6 @@ type PruneResult struct {
 // =============================================================================
 // Core Service Methods
 // =============================================================================
-
 
 func initCfg() (aws.Config, error) {
 	configFunctions := []func(*config.LoadOptions) error{
