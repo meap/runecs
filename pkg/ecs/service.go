@@ -34,13 +34,8 @@ const (
 	defaultNumberOfRetries = 10
 )
 
-// ECS parameters that are used to run jobs.
-type Service struct {
-	Cluster string `mapstructure:"CLUSTER"`
-	Service string `mapstructure:"SERVICE"`
-}
 
-// Local types used by Service methods
+// Local types used by ECS functions
 type ServiceDefinition struct {
 	Subnets        []string
 	SecurityGroups []string
@@ -120,18 +115,6 @@ type PruneResult struct {
 // Core Service Methods
 // =============================================================================
 
-func (s *Service) loadService(ctx context.Context, svc *ecs.Client) (types.Service, error) {
-	response, err := svc.DescribeServices(ctx, &ecs.DescribeServicesInput{
-		Cluster:  &s.Cluster,
-		Services: []string{s.Service},
-	})
-
-	if err != nil {
-		return types.Service{}, err
-	}
-
-	return response.Services[0], nil
-}
 
 func initCfg() (aws.Config, error) {
 	configFunctions := []func(*config.LoadOptions) error{
@@ -153,15 +136,10 @@ func initCfg() (aws.Config, error) {
 // Deploy Methods
 // =============================================================================
 
-func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *ecs.Client) (string, error) {
-	_, err := s.loadService(ctx, svc)
-	if err != nil {
-		return "", err
-	}
-
+func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, svc *ecs.Client) (string, error) {
 	// Get the last task definition ARN.
 	// Load the latest task definition.
-	latestDef, err := s.latestTaskDefinitionArn(ctx, svc)
+	latestDef, err := latestTaskDefinitionArn(ctx, cluster, service, svc)
 	if err != nil {
 		return "", err
 	}
@@ -196,7 +174,7 @@ func (s *Service) cloneTaskDef(ctx context.Context, dockerImageTag string, svc *
 	return *output.TaskDefinition.TaskDefinitionArn, nil
 }
 
-func (s *Service) Deploy(dockerImageTag string) (*DeployResult, error) {
+func Deploy(cluster, service, dockerImageTag string) (*DeployResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
@@ -207,14 +185,14 @@ func (s *Service) Deploy(dockerImageTag string) (*DeployResult, error) {
 	svc := ecs.NewFromConfig(cfg)
 
 	// Clones the latest version of the task definition and inserts the new Docker URI.
-	TaskDefinitionArn, err := s.cloneTaskDef(ctx, dockerImageTag, svc)
+	TaskDefinitionArn, err := cloneTaskDef(ctx, cluster, service, dockerImageTag, svc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to clone task definition: %w", err)
 	}
 
 	updateOutput, err := svc.UpdateService(ctx, &ecs.UpdateServiceInput{
-		Cluster:        &s.Cluster,
-		Service:        &s.Service,
+		Cluster:        &cluster,
+		Service:        &service,
 		TaskDefinition: &TaskDefinitionArn,
 	})
 
@@ -232,10 +210,10 @@ func (s *Service) Deploy(dockerImageTag string) (*DeployResult, error) {
 // Execute Methods
 // =============================================================================
 
-func (s *Service) describeService(ctx context.Context, client *ecs.Client) (ServiceDefinition, error) {
+func describeService(ctx context.Context, cluster, service string, client *ecs.Client) (ServiceDefinition, error) {
 	resp, err := client.DescribeServices(ctx, &ecs.DescribeServicesInput{
-		Cluster:  &s.Cluster,
-		Services: []string{s.Service},
+		Cluster:  &cluster,
+		Services: []string{service},
 	})
 
 	if err != nil {
@@ -246,7 +224,7 @@ func (s *Service) describeService(ctx context.Context, client *ecs.Client) (Serv
 
 	// Fetch the latest task definition. Keep in mind that the active service may
 	// have a different task definition that is available, see. *def.TaskDefinition
-	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
+	taskDef, err := latestTaskDefinitionArn(ctx, cluster, service, client)
 	if err != nil {
 		return ServiceDefinition{}, err
 	}
@@ -258,7 +236,7 @@ func (s *Service) describeService(ctx context.Context, client *ecs.Client) (Serv
 	}, nil
 }
 
-func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
+func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
 	resp, _ := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 
 	if len(resp.TaskDefinition.ContainerDefinitions) == 0 {
@@ -280,9 +258,9 @@ func (s *Service) describeTask(ctx context.Context, client *ecs.Client, taskArn 
 	return output, nil
 }
 
-func (s *Service) wait(ctx context.Context, client *ecs.Client, task string) (bool, error) {
+func wait(ctx context.Context, cluster string, client *ecs.Client, task string) (bool, error) {
 	output, err := client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
-		Cluster: &s.Cluster,
+		Cluster: &cluster,
 		Tasks:   []string{task},
 	})
 
@@ -299,7 +277,7 @@ func (s *Service) wait(ctx context.Context, client *ecs.Client, task string) (bo
 	return *output.Tasks[0].LastStatus == "STOPPED", nil
 }
 
-func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*ExecuteResult, error) {
+func Execute(cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, err
@@ -309,12 +287,12 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*Exec
 
 	svc := ecs.NewFromConfig(cfg)
 
-	sdef, err := s.describeService(ctx, svc)
+	sdef, err := describeService(ctx, cluster, service, svc)
 	if err != nil {
-		return nil, fmt.Errorf("error loading service %s in cluster %s: %w", s.Service, s.Cluster, err)
+		return nil, fmt.Errorf("error loading service %s in cluster %s: %w", service, cluster, err)
 	}
 
-	tdef, err := s.describeTask(ctx, svc, &sdef.TaskDef)
+	tdef, err := describeTask(ctx, svc, &sdef.TaskDef)
 	if err != nil {
 		return nil, fmt.Errorf("error loading task definition %s: %w", sdef.TaskDef, err)
 	}
@@ -323,7 +301,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*Exec
 	newTaskDefCreated := false
 
 	if dockerImageTag != "" {
-		taskDef, err = s.cloneTaskDef(ctx, dockerImageTag, svc)
+		taskDef, err = cloneTaskDef(ctx, cluster, service, dockerImageTag, svc)
 		if err != nil {
 			return nil, err
 		}
@@ -333,7 +311,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*Exec
 	}
 
 	output, err := svc.RunTask(ctx, &ecs.RunTaskInput{
-		Cluster:        &s.Cluster,
+		Cluster:        &cluster,
 		TaskDefinition: &taskDef,
 		LaunchType:     "FARGATE",
 		NetworkConfiguration: &types.NetworkConfiguration{
@@ -357,7 +335,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*Exec
 
 	executedTask := output.Tasks[0]
 	result := &ExecuteResult{
-		ServiceName:       s.Service,
+		ServiceName:       service,
 		TaskDefinition:    taskDef,
 		TaskArn:           *executedTask.TaskArn,
 		NewTaskDefCreated: newTaskDefCreated,
@@ -365,17 +343,17 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*Exec
 		Logs:              []LogEntry{},
 	}
 
-	if wait {
+	if waitForCompletion {
 		var lastTimestamp *int64 = nil
 
 		for {
-			logs, newTimestamp, err := s.getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp)
+			logs, newTimestamp, err := getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp)
 			if err == nil {
 				result.Logs = append(result.Logs, logs...)
 				lastTimestamp = &newTimestamp
 			}
 
-			success, err := s.wait(ctx, svc, *executedTask.TaskArn)
+			success, err := wait(ctx, cluster, svc, *executedTask.TaskArn)
 			if err != nil {
 				return result, err
 			}
@@ -396,7 +374,7 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*Exec
 // Logs Methods
 // =============================================================================
 
-func (s *Service) getProcessLogs(
+func getProcessLogs(
 	ctx context.Context, logGroupname string,
 	logStreamPrefix string,
 	taskArn string,
@@ -451,7 +429,7 @@ func (s *Service) getProcessLogs(
 // Prune Methods
 // =============================================================================
 
-func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) (int, int, int, []TaskDefinitionPruneEntry, error) {
+func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) (int, int, int, []TaskDefinitionPruneEntry, error) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &family,
 		Sort:         types.SortOrderDesc,
@@ -559,7 +537,7 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 	return totalCount, deleted, skipped, processedTasks, nil
 }
 
-func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
+func Prune(cluster, service string, keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, err
@@ -569,12 +547,12 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) (*PruneResult, 
 
 	svc := ecs.NewFromConfig(cfg)
 
-	familyPrefix, err := s.getFamilyPrefix(ctx, svc)
+	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, svc)
 	if err != nil {
 		return nil, err
 	}
 
-	families, err := s.getFamilies(ctx, familyPrefix, svc)
+	families, err := getFamilies(ctx, familyPrefix, svc)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +568,7 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) (*PruneResult, 
 	}
 
 	for _, family := range families {
-		totalCount, deletedCount, skippedCount, processedTasks, err := s.deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, svc)
+		totalCount, deletedCount, skippedCount, processedTasks, err := deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, svc)
 		if err != nil {
 			return nil, err
 		}
@@ -611,10 +589,10 @@ func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) (*PruneResult, 
 // Restart Methods
 // =============================================================================
 
-func (s *Service) stopAll(ctx context.Context, client *ecs.Client) ([]StoppedTaskInfo, error) {
+func stopAll(ctx context.Context, cluster, service string, client *ecs.Client) ([]StoppedTaskInfo, error) {
 	tasks, err := client.ListTasks(ctx, &ecs.ListTasksInput{
-		Cluster:     &s.Cluster,
-		ServiceName: &s.Service,
+		Cluster:     &cluster,
+		ServiceName: &service,
 	})
 	if err != nil {
 		return nil, err
@@ -623,7 +601,7 @@ func (s *Service) stopAll(ctx context.Context, client *ecs.Client) ([]StoppedTas
 	var stoppedTasks []StoppedTaskInfo
 	for _, taskArn := range tasks.TaskArns {
 		output, err := client.StopTask(ctx, &ecs.StopTaskInput{
-			Cluster: &s.Cluster,
+			Cluster: &cluster,
 			Task:    &taskArn,
 		})
 		if err != nil {
@@ -640,15 +618,15 @@ func (s *Service) stopAll(ctx context.Context, client *ecs.Client) ([]StoppedTas
 	return stoppedTasks, nil
 }
 
-func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) (string, string, error) {
-	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
+func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Client) (string, string, error) {
+	taskDef, err := latestTaskDefinitionArn(ctx, cluster, service, client)
 	if err != nil {
 		return "", "", err
 	}
 
 	output, err := client.UpdateService(ctx, &ecs.UpdateServiceInput{
-		Cluster:            &s.Cluster,
-		Service:            &s.Service,
+		Cluster:            &cluster,
+		Service:            &service,
 		TaskDefinition:     &taskDef,
 		ForceNewDeployment: true,
 	})
@@ -660,7 +638,7 @@ func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) (strin
 	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
 }
 
-func (s *Service) Restart(kill bool) (*RestartResult, error) {
+func Restart(cluster, service string, kill bool) (*RestartResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
@@ -673,14 +651,14 @@ func (s *Service) Restart(kill bool) (*RestartResult, error) {
 
 	if kill {
 		result.Method = "kill"
-		stoppedTasks, err := s.stopAll(ctx, svc)
+		stoppedTasks, err := stopAll(ctx, cluster, service, svc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to stop tasks: %w", err)
 		}
 		result.StoppedTasks = stoppedTasks
 	} else {
 		result.Method = "force_deploy"
-		serviceArn, taskDefinition, err := s.forceNewDeploy(ctx, svc)
+		serviceArn, taskDefinition, err := forceNewDeploy(ctx, cluster, service, svc)
 		if err != nil {
 			return nil, fmt.Errorf("failed to force new deployment: %w", err)
 		}
@@ -695,7 +673,7 @@ func (s *Service) Restart(kill bool) (*RestartResult, error) {
 // Revision Methods
 // =============================================================================
 
-func (s *Service) getFamilies(ctx context.Context, familyPrefix string, svc *ecs.Client) ([]string, error) {
+func getFamilies(ctx context.Context, familyPrefix string, svc *ecs.Client) ([]string, error) {
 	response, err := svc.ListTaskDefinitionFamilies(ctx, &ecs.ListTaskDefinitionFamiliesInput{
 		FamilyPrefix: &familyPrefix,
 	})
@@ -707,14 +685,18 @@ func (s *Service) getFamilies(ctx context.Context, familyPrefix string, svc *ecs
 	return response.Families, nil
 }
 
-func (s *Service) getFamilyPrefix(ctx context.Context, svc *ecs.Client) (string, error) {
-	service, err := s.loadService(ctx, svc)
+func getFamilyPrefix(ctx context.Context, cluster, service string, svc *ecs.Client) (string, error) {
+	serviceResponse, err := svc.DescribeServices(ctx, &ecs.DescribeServicesInput{
+		Cluster:  &cluster,
+		Services: []string{service},
+	})
 	if err != nil {
 		return "", err
 	}
 
+	serviceInfo := serviceResponse.Services[0]
 	response, err := svc.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
-		TaskDefinition: service.TaskDefinition,
+		TaskDefinition: serviceInfo.TaskDefinition,
 	})
 
 	if err != nil {
@@ -724,13 +706,8 @@ func (s *Service) getFamilyPrefix(ctx context.Context, svc *ecs.Client) (string,
 	return *response.TaskDefinition.Family, nil
 }
 
-func (s *Service) latestTaskDefinitionArn(ctx context.Context, svc *ecs.Client) (string, error) {
-	_, err := s.loadService(ctx, svc)
-	if err != nil {
-		return "", err
-	}
-
-	prefix, err := s.getFamilyPrefix(ctx, svc)
+func latestTaskDefinitionArn(ctx context.Context, cluster, service string, svc *ecs.Client) (string, error) {
+	prefix, err := getFamilyPrefix(ctx, cluster, service, svc)
 	if err != nil {
 		return "", err
 	}
@@ -747,7 +724,7 @@ func (s *Service) latestTaskDefinitionArn(ctx context.Context, svc *ecs.Client) 
 	return response.TaskDefinitionArns[0], nil
 }
 
-func (s *Service) getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int, svc *ecs.Client) ([]RevisionEntry, error) {
+func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int, svc *ecs.Client) ([]RevisionEntry, error) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &familyPrefix,
 		Sort:         types.SortOrderDesc,
@@ -796,7 +773,7 @@ func (s *Service) getRevisions(ctx context.Context, familyPrefix string, lastRev
 	return revisions, nil
 }
 
-func (s *Service) Revisions(lastRevisionNr int) (*RevisionsResult, error) {
+func Revisions(cluster, service string, lastRevisionNr int) (*RevisionsResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, err
@@ -806,19 +783,19 @@ func (s *Service) Revisions(lastRevisionNr int) (*RevisionsResult, error) {
 
 	svc := ecs.NewFromConfig(cfg)
 
-	familyPrefix, err := s.getFamilyPrefix(ctx, svc)
+	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, svc)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.getFamilies(ctx, familyPrefix, svc)
+	response, err := getFamilies(ctx, familyPrefix, svc)
 	if err != nil {
 		return nil, err
 	}
 
 	var allRevisions []RevisionEntry
 	for _, family := range response {
-		revisions, err := s.getRevisions(ctx, family, lastRevisionNr, svc)
+		revisions, err := getRevisions(ctx, family, lastRevisionNr, svc)
 		if err != nil {
 			return nil, err
 		}

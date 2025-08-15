@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"runecs.io/v1/pkg/ecs"
 )
 
 func newRevisionsCommand() *cobra.Command {
@@ -29,8 +30,8 @@ func newRevisionsCommand() *cobra.Command {
 func revisionsHandler(cmd *cobra.Command, args []string) {
 	revNr, _ := cmd.Flags().GetInt("last")
 
-	svc := initService()
-	result, err := svc.Revisions(revNr)
+	cluster, service := parseServiceFlag()
+	result, err := ecs.Revisions(cluster, service, revNr)
 	if err != nil {
 		log.Fatalln(err)
 	}

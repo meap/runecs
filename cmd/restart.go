@@ -6,6 +6,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
+	"runecs.io/v1/pkg/ecs"
 )
 
 func newRestartCommand() *cobra.Command {
@@ -23,8 +24,8 @@ func newRestartCommand() *cobra.Command {
 func restartHandler(cmd *cobra.Command, args []string) {
 	kill, _ := cmd.Flags().GetBool("kill")
 
-	svc := initService()
-	result, err := svc.Restart(kill)
+	cluster, service := parseServiceFlag()
+	result, err := ecs.Restart(cluster, service, kill)
 	if err != nil {
 		log.Fatalf("Restart failed: %v\n", err)
 	}
@@ -34,7 +35,7 @@ func restartHandler(cmd *cobra.Command, args []string) {
 			fmt.Printf("Stopped task %s started %s\n", stoppedTask.TaskArn, humanize.Time(stoppedTask.StartedAt))
 		}
 	} else {
-		fmt.Printf("Service %s restarted by starting new tasks using task definition %s.\n", svc.Service, result.TaskDefinition)
+		fmt.Printf("Service %s restarted by starting new tasks using task definition %s.\n", service, result.TaskDefinition)
 	}
 
 	fmt.Println("Done.")

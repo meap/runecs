@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"runecs.io/v1/pkg/ecs"
 )
 
 func newPruneCommand() *cobra.Command {
@@ -27,8 +28,8 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 	keepDays, _ := cmd.Flags().GetInt("keep-days")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
-	svc := initService()
-	result, err := svc.Prune(keepLastNr, keepDays, dryRun)
+	cluster, service := parseServiceFlag()
+	result, err := ecs.Prune(cluster, service, keepLastNr, keepDays, dryRun)
 	if err != nil {
 		log.Fatalln(err)
 	}

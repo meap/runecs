@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
+	"runecs.io/v1/pkg/ecs"
 )
 
 func newDeployCommand() *cobra.Command {
@@ -34,8 +35,8 @@ func deployPreRunE(dockerImageTag *string) func(*cobra.Command, []string) error 
 
 func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
-		svc := initService()
-		result, err := svc.Deploy(*dockerImageTag)
+		cluster, service := parseServiceFlag()
+		result, err := ecs.Deploy(cluster, service, *dockerImageTag)
 		if err != nil {
 			log.Fatalf("Deploy failed: %v\n", err)
 		}

@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/spf13/cobra"
+	"runecs.io/v1/pkg/ecs"
 )
 
 func newRunCommand() *cobra.Command {
@@ -29,9 +30,9 @@ func newRunCommand() *cobra.Command {
 
 func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
-		svc := initService()
+		cluster, service := parseServiceFlag()
 
-		result, err := svc.Execute(args, *execWait, *dockerImageTag)
+		result, err := ecs.Execute(cluster, service, args, *execWait, *dockerImageTag)
 		if err != nil {
 			log.Fatalln(err)
 		}

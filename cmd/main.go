@@ -21,9 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-playground/validator"
 	"github.com/spf13/cobra"
-	"runecs.io/v1/pkg/ecs"
 )
 
 const (
@@ -58,24 +56,22 @@ func init() {
 	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
 }
 
-func initService() *ecs.Service {
-	svc := ecs.Service{}
+func parseServiceFlag() (cluster, service string) {
 	serviceValue := rootCmd.Flag("service").Value.String()
 
 	parsed := strings.Split(serviceValue, "/")
 	if len(parsed) == 2 {
-		svc.Cluster = parsed[0]
-		svc.Service = parsed[1]
+		cluster = parsed[0]
+		service = parsed[1]
 	} else if serviceValue != "" {
 		log.Fatalf("Invalid service name %s\n", serviceValue)
 	}
 
-	validate := validator.New()
-	if err := validate.Struct(&svc); err != nil {
-		log.Fatalf("Missing configuration properties %v\n", err)
+	if cluster == "" || service == "" {
+		log.Fatalf("Missing cluster or service configuration\n")
 	}
 
-	return &svc
+	return cluster, service
 }
 
 func Execute() {
