@@ -284,6 +284,7 @@ func Execute(cluster, service string, cmd []string, waitForCompletion bool, dock
 	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
+	logClient := cloudwatchlogs.NewFromConfig(cfg)
 
 	sdef, err := describeService(ctx, cluster, service, svc)
 	if err != nil {
@@ -345,7 +346,7 @@ func Execute(cluster, service string, cmd []string, waitForCompletion bool, dock
 		var lastTimestamp *int64 = nil
 
 		for {
-			logs, newTimestamp, err := getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp)
+			logs, newTimestamp, err := getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp, logClient)
 			if err == nil {
 				result.Logs = append(result.Logs, logs...)
 				lastTimestamp = &newTimestamp
@@ -377,18 +378,13 @@ func getProcessLogs(
 	logStreamPrefix string,
 	taskArn string,
 	name string,
-	startTime *int64) ([]LogEntry, int64, error) {
-
-	cfg, err := initCfg()
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
-	}
+	startTime *int64,
+	client *cloudwatchlogs.Client) ([]LogEntry, int64, error) {
 
 	processID, err := extractARNResource(taskArn)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to extract process ID from task ARN: %w", err)
 	}
-	client := cloudwatchlogs.NewFromConfig(cfg)
 
 	input := &cloudwatchlogs.FilterLogEventsInput{
 		LogGroupName:   aws.String(logGroupname),
