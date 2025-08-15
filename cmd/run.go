@@ -1,6 +1,12 @@
+// ABOUTME: Command-line interface for running ECS tasks
+// ABOUTME: Handles user input and output formatting for task execution
+
 package cmd
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +30,37 @@ func newRunCommand() *cobra.Command {
 func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		svc := initService()
-		svc.Execute(args, *execWait, *dockerImageTag)
+
+		result, err := svc.Execute(args, *execWait, *dockerImageTag)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		// Display service loading information
+		fmt.Printf("Service '%s' loaded.\n", result.ServiceName)
+
+		// Display task definition information
+		if result.NewTaskDefCreated {
+			fmt.Printf("New task definition %s is created\n", result.TaskDefinition)
+		} else {
+			fmt.Printf("The task definition %s is used\n", result.TaskDefinition)
+		}
+
+		fmt.Println()
+
+		// Display task execution information
+		fmt.Printf("Task %s executed\n", result.TaskArn)
+
+		// Display logs if waiting
+		if *execWait {
+			for _, logEntry := range result.Logs {
+				fmt.Println(logEntry.StreamName, logEntry.Message)
+			}
+
+			if result.Finished {
+				fmt.Printf("task %s finished\n", result.TaskArn)
+			}
+		}
 	}
 }
 

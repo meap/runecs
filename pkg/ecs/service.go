@@ -29,9 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/dustin/go-humanize"
-	"github.com/fatih/color"
 	"github.com/jinzhu/copier"
-	"github.com/rodaine/table"
 )
 
 const (
@@ -59,8 +57,30 @@ type TaskDefinition struct {
 	Memory          string
 }
 
-type PrintProcessLogsOutput struct {
-	lastEventTimestamp int64
+type LogEntry struct {
+	StreamName string
+	Message    string
+	Timestamp  int64
+}
+
+type ExecuteResult struct {
+	ServiceName       string
+	TaskDefinition    string
+	TaskArn           string
+	NewTaskDefCreated bool
+	Finished          bool
+	Logs              []LogEntry
+}
+
+type RevisionEntry struct {
+	Revision  int32
+	CreatedAt time.Time
+	DockerURI string
+	Family    string
+}
+
+type RevisionsResult struct {
+	Revisions []RevisionEntry
 }
 
 // =============================================================================
@@ -189,7 +209,6 @@ func (s *Service) describeService(ctx context.Context, client *ecs.Client) (Serv
 	}
 
 	def := resp.Services[0]
-	fmt.Printf("Service '%s' loaded. \n", *def.ServiceName)
 
 	// Fetch the latest task definition. Keep in mind that the active service may
 	// have a different task definition that is available, see. *def.TaskDefinition
@@ -246,10 +265,10 @@ func (s *Service) wait(ctx context.Context, client *ecs.Client, task string) (bo
 	return *output.Tasks[0].LastStatus == "STOPPED", nil
 }
 
-func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
+func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) (*ExecuteResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
 	ctx := context.Background()
@@ -258,28 +277,26 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 
 	sdef, err := s.describeService(ctx, svc)
 	if err != nil {
-		log.Fatalf("An error occurred while loading the service %s in the cluster %s: %v", s.Service, s.Cluster, err)
+		return nil, fmt.Errorf("error loading service %s in cluster %s: %w", s.Service, s.Cluster, err)
 	}
 
 	tdef, err := s.describeTask(ctx, svc, &sdef.TaskDef)
 	if err != nil {
-		log.Fatalf("An error occurred while loading the task definition %s: %v", sdef.TaskDef, err)
+		return nil, fmt.Errorf("error loading task definition %s: %w", sdef.TaskDef, err)
 	}
 
 	var taskDef string
+	newTaskDefCreated := false
 
 	if dockerImageTag != "" {
 		taskDef, err = s.cloneTaskDef(ctx, dockerImageTag, svc)
 		if err != nil {
-			log.Fatalln(err)
+			return nil, err
 		}
-		fmt.Printf("New task definition %s is created", taskDef)
+		newTaskDefCreated = true
 	} else {
 		taskDef = sdef.TaskDef
-		fmt.Printf("The task definition %s is used", taskDef)
 	}
-
-	fmt.Println()
 
 	output, err := svc.RunTask(ctx, &ecs.RunTaskInput{
 		Cluster:        &s.Cluster,
@@ -301,49 +318,60 @@ func (s *Service) Execute(cmd []string, wait bool, dockerImageTag string) {
 	})
 
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
 	executedTask := output.Tasks[0]
-	var lastTimestamp *int64 = nil
-
-	fmt.Printf("Task %s executed\n", *executedTask.TaskArn)
+	result := &ExecuteResult{
+		ServiceName:       s.Service,
+		TaskDefinition:    taskDef,
+		TaskArn:           *executedTask.TaskArn,
+		NewTaskDefCreated: newTaskDefCreated,
+		Finished:          false,
+		Logs:              []LogEntry{},
+	}
 
 	if wait {
+		var lastTimestamp *int64 = nil
+
 		for {
-			logsOutput, _ := s.printProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp)
-			lastTimestamp = &logsOutput.lastEventTimestamp
+			logs, newTimestamp, err := s.getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp)
+			if err == nil {
+				result.Logs = append(result.Logs, logs...)
+				lastTimestamp = &newTimestamp
+			}
 
 			success, err := s.wait(ctx, svc, *executedTask.TaskArn)
 			if err != nil {
-				log.Fatalln(err)
+				return result, err
 			}
 
 			if success {
+				result.Finished = true
 				break
 			}
 
 			time.Sleep(5 * time.Second)
 		}
-
-		fmt.Printf("task %s finished\n", *executedTask.TaskArn)
 	}
+
+	return result, nil
 }
 
 // =============================================================================
 // Logs Methods
 // =============================================================================
 
-func (s *Service) printProcessLogs(
+func (s *Service) getProcessLogs(
 	ctx context.Context, logGroupname string,
 	logStreamPrefix string,
 	taskArn string,
 	name string,
-	startTime *int64) (PrintProcessLogsOutput, error) {
+	startTime *int64) ([]LogEntry, int64, error) {
 
 	cfg, err := initCfg()
 	if err != nil {
-		return PrintProcessLogsOutput{}, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
+		return nil, 0, fmt.Errorf("failed to initialize AWS configuration. (%w)", err)
 	}
 
 	processID := extractProcessID(taskArn)
@@ -361,11 +389,16 @@ func (s *Service) printProcessLogs(
 	output, err := client.FilterLogEvents(ctx, input)
 
 	if err != nil {
-		return PrintProcessLogsOutput{}, fmt.Errorf("failed to filter log events (%w)", err)
+		return nil, 0, fmt.Errorf("failed to filter log events (%w)", err)
 	}
 
+	var logs []LogEntry
 	for _, event := range output.Events {
-		fmt.Println(*event.LogStreamName, *event.Message)
+		logs = append(logs, LogEntry{
+			StreamName: *event.LogStreamName,
+			Message:    *event.Message,
+			Timestamp:  *event.Timestamp,
+		})
 	}
 
 	var lastEventTimestamp int64
@@ -377,9 +410,7 @@ func (s *Service) printProcessLogs(
 		lastEventTimestamp = 0
 	}
 
-	return PrintProcessLogsOutput{
-		lastEventTimestamp: lastEventTimestamp,
-	}, nil
+	return logs, lastEventTimestamp, nil
 }
 
 // =============================================================================
@@ -618,25 +649,20 @@ func (s *Service) latestTaskDefinitionArn(ctx context.Context, svc *ecs.Client) 
 	return response.TaskDefinitionArns[0], nil
 }
 
-func (s *Service) printRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int, svc *ecs.Client) {
+func (s *Service) getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int, svc *ecs.Client) ([]RevisionEntry, error) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &familyPrefix,
 		Sort:         types.SortOrderDesc,
 	}
 
-	headerFmt := color.New(color.FgBlue, color.Underline).SprintfFunc()
-	columnFmt := color.New(color.FgYellow).SprintfFunc()
-
-	tbl := table.New("Revision", "Created At", "Docker URI")
-	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
-
+	var revisions []RevisionEntry
 	total := 0
 
 	for {
 		response, err := svc.ListTaskDefinitions(ctx, definitionInput)
 
 		if err != nil {
-			log.Fatalln(err)
+			return nil, err
 		}
 
 		for _, def := range response.TaskDefinitionArns {
@@ -649,12 +675,16 @@ func (s *Service) printRevisions(ctx context.Context, familyPrefix string, lastR
 			})
 
 			if err != nil {
-				log.Printf("Failed to describe task definition %s. (%v)\n", def, err)
-
+				// Log error but continue processing other revisions
 				continue
 			}
 
-			tbl.AddRow(resp.TaskDefinition.Revision, resp.TaskDefinition.RegisteredAt, *resp.TaskDefinition.ContainerDefinitions[0].Image)
+			revisions = append(revisions, RevisionEntry{
+				Revision:  resp.TaskDefinition.Revision,
+				CreatedAt: *resp.TaskDefinition.RegisteredAt,
+				DockerURI: *resp.TaskDefinition.ContainerDefinitions[0].Image,
+				Family:    familyPrefix,
+			})
 			total++
 		}
 
@@ -665,13 +695,13 @@ func (s *Service) printRevisions(ctx context.Context, familyPrefix string, lastR
 		definitionInput.NextToken = response.NextToken
 	}
 
-	tbl.Print()
+	return revisions, nil
 }
 
-func (s *Service) Revisions(lastRevisionNr int) {
+func (s *Service) Revisions(lastRevisionNr int) (*RevisionsResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
 	ctx := context.Background()
@@ -680,15 +710,24 @@ func (s *Service) Revisions(lastRevisionNr int) {
 
 	familyPrefix, err := s.getFamilyPrefix(ctx, svc)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
 	response, err := s.getFamilies(ctx, familyPrefix, svc)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
+	var allRevisions []RevisionEntry
 	for _, family := range response {
-		s.printRevisions(ctx, family, lastRevisionNr, svc)
+		revisions, err := s.getRevisions(ctx, family, lastRevisionNr, svc)
+		if err != nil {
+			return nil, err
+		}
+		allRevisions = append(allRevisions, revisions...)
 	}
+
+	return &RevisionsResult{
+		Revisions: allRevisions,
+	}, nil
 }
