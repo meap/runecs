@@ -14,20 +14,22 @@ type Version struct {
 
 var version *Version
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "print the version number and exit",
-	Run:   printVersion,
+func newVersionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "print the version number and exit",
+		Run:   versionHandler,
+	}
 }
 
-func init() {
-	rootCmd.AddCommand(versionCmd)
-}
-
-func printVersion(cmd *cobra.Command, args []string) {
+func versionHandler(cmd *cobra.Command, args []string) {
 	fmt.Printf("runecs %s\n", version.Version)
 }
 
 func SetVersion(v *Version) {
 	version = v
+}
+
+func init() {
+	rootCmd.AddCommand(newVersionCommand())
 }

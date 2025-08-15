@@ -4,22 +4,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
+func newRunCommand() *cobra.Command {
 	var dockerImageTag string
 	var execWait bool
 
-	runCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:                   "run [cmd]",
 		Short:                 "Execute a one-off process in an AWS ECS cluster",
 		Args:                  cobra.MinimumNArgs(1),
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, args []string) {
-			svc := initService()
-			svc.Execute(args, execWait, dockerImageTag)
-		},
+		Run:                   runHandler(&dockerImageTag, &execWait),
 	}
 
-	runCmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
-	runCmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
-	rootCmd.AddCommand(runCmd)
+	cmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for the task to finish")
+	cmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
+	return cmd
+}
+
+func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []string) {
+	return func(cmd *cobra.Command, args []string) {
+		svc := initService()
+		svc.Execute(args, *execWait, *dockerImageTag)
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(newRunCommand())
 }

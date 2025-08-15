@@ -4,19 +4,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	revisionsCmd := &cobra.Command{
+func newRevisionsCommand() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:                   "revisions",
 		Short:                 "List of active task definitions",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, args []string) {
-			revNr, _ := cmd.Flags().GetInt("last")
-
-			svc := initService()
-			svc.Revisions(revNr)
-		},
+		Run:                   revisionsHandler,
 	}
 
-	revisionsCmd.PersistentFlags().IntP("last", "", 0, "last N revisions")
-	rootCmd.AddCommand(revisionsCmd)
+	cmd.PersistentFlags().IntP("last", "", 0, "last N revisions")
+	return cmd
+}
+
+func revisionsHandler(cmd *cobra.Command, args []string) {
+	revNr, _ := cmd.Flags().GetInt("last")
+
+	svc := initService()
+	svc.Revisions(revNr)
+}
+
+func init() {
+	rootCmd.AddCommand(newRevisionsCommand())
 }
