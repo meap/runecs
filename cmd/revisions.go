@@ -4,10 +4,12 @@
 package cmd
 
 import (
+	"fmt"
 	"log"
+	"sort"
+	"time"
 
-	"github.com/fatih/color"
-	"github.com/rodaine/table"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -32,20 +34,20 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 		log.Fatalln(err)
 	}
 
-	// Create formatted table with colors
-	headerFmt := color.New(color.FgBlue, color.Underline).SprintfFunc()
-	columnFmt := color.New(color.FgYellow).SprintfFunc()
+	// Sort revisions by revision number in descending order
+	sort.Slice(result.Revisions, func(i, j int) bool {
+		return result.Revisions[i].Revision > result.Revisions[j].Revision
+	})
 
-	tbl := table.New("Revision", "Created At", "Docker URI")
-	tbl.WithHeaderFormatter(headerFmt).WithFirstColumnFormatter(columnFmt)
-
-	// Add all revision entries to the table
+	// Create lipgloss style for date formatting
+	dateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	
+	// Print bullet list with created date and docker URI
 	for _, revision := range result.Revisions {
-		tbl.AddRow(revision.Revision, revision.CreatedAt, revision.DockerURI)
+		// Use proper Go time formatting for date and time without seconds
+		formattedDate := dateStyle.Render(revision.CreatedAt.Local().Format(time.DateTime)[:16])
+		fmt.Printf("• %s: %s\n", formattedDate, revision.DockerURI)
 	}
-
-	// Print the formatted table
-	tbl.Print()
 }
 
 func init() {
