@@ -3,6 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
@@ -26,7 +29,11 @@ func newListCommand() *cobra.Command {
 func listHandler(cmd *cobra.Command, args []string) error {
 	all, _ := cmd.Flags().GetBool("all")
 
-	clusters, err := ecs.GetClusters(context.Background(), all)
+	// Set up context that cancels on interrupt signal for cancellable list operations
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	clusters, err := ecs.GetClusters(ctx, all)
 	if err != nil {
 		return err
 	}

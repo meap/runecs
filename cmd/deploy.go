@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"runecs.io/v1/pkg/ecs"
@@ -36,8 +39,12 @@ func deployPreRunE(dockerImageTag *string) func(*cobra.Command, []string) error 
 
 func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
+		// Set up context that cancels on interrupt signal for cancellable deploy operations
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+
 		cluster, service := parseServiceFlag()
-		result, err := ecs.Deploy(context.Background(), cluster, service, *dockerImageTag)
+		result, err := ecs.Deploy(ctx, cluster, service, *dockerImageTag)
 		if err != nil {
 			log.Fatalf("Deploy failed: %v\n", err)
 		}

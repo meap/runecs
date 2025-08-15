@@ -7,8 +7,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -31,8 +34,12 @@ func newRevisionsCommand() *cobra.Command {
 func revisionsHandler(cmd *cobra.Command, args []string) {
 	revNr, _ := cmd.Flags().GetInt("last")
 
+	// Set up context that cancels on interrupt signal for cancellable revisions operations
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	cluster, service := parseServiceFlag()
-	result, err := ecs.Revisions(context.Background(), cluster, service, revNr)
+	result, err := ecs.Revisions(ctx, cluster, service, revNr)
 	if err != nil {
 		log.Fatalln(err)
 	}

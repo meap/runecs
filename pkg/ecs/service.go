@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package herrors contains common Hugo errors and error related utilities.
 package ecs
 
 import (
@@ -378,7 +377,7 @@ func Execute(ctx context.Context, cluster, service string, cmd []string, waitFor
 			AwsvpcConfiguration: &types.AwsVpcConfiguration{
 				Subnets:        sdef.Subnets,
 				SecurityGroups: sdef.SecurityGroups,
-				AssignPublicIp: "ENABLED",
+				AssignPublicIp: "ENABLED", // FIXME: Public IP is not needed (mostly)
 			},
 		},
 		Overrides: &types.TaskOverride{

@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -25,8 +28,12 @@ func newRestartCommand() *cobra.Command {
 func restartHandler(cmd *cobra.Command, args []string) {
 	kill, _ := cmd.Flags().GetBool("kill")
 
+	// Set up context that cancels on interrupt signal for cancellable restart operations
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	cluster, service := parseServiceFlag()
-	result, err := ecs.Restart(context.Background(), cluster, service, kill)
+	result, err := ecs.Restart(ctx, cluster, service, kill)
 	if err != nil {
 		log.Fatalf("Restart failed: %v\n", err)
 	}
