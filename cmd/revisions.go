@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sort"
@@ -31,7 +32,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 	revNr, _ := cmd.Flags().GetInt("last")
 
 	cluster, service := parseServiceFlag()
-	result, err := ecs.Revisions(cluster, service, revNr)
+	result, err := ecs.Revisions(context.Background(), cluster, service, revNr)
 	if err != nil {
 		log.Fatalln(err)
 	}

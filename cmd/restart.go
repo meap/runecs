@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -25,7 +26,7 @@ func restartHandler(cmd *cobra.Command, args []string) {
 	kill, _ := cmd.Flags().GetBool("kill")
 
 	cluster, service := parseServiceFlag()
-	result, err := ecs.Restart(cluster, service, kill)
+	result, err := ecs.Restart(context.Background(), cluster, service, kill)
 	if err != nil {
 		log.Fatalf("Restart failed: %v\n", err)
 	}

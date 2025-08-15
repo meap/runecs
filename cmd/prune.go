@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -28,8 +32,12 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 	keepDays, _ := cmd.Flags().GetInt("keep-days")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
+	// Set up context that cancels on interrupt signal for cancellable prune operations
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	cluster, service := parseServiceFlag()
-	result, err := ecs.Prune(cluster, service, keepLastNr, keepDays, dryRun)
+	result, err := ecs.Prune(ctx, cluster, service, keepLastNr, keepDays, dryRun)
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -36,7 +37,7 @@ func deployPreRunE(dockerImageTag *string) func(*cobra.Command, []string) error 
 func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		cluster, service := parseServiceFlag()
-		result, err := ecs.Deploy(cluster, service, *dockerImageTag)
+		result, err := ecs.Deploy(context.Background(), cluster, service, *dockerImageTag)
 		if err != nil {
 			log.Fatalf("Deploy failed: %v\n", err)
 		}

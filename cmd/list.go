@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/charmbracelet/lipgloss"
@@ -25,7 +26,7 @@ func newListCommand() *cobra.Command {
 func listHandler(cmd *cobra.Command, args []string) error {
 	all, _ := cmd.Flags().GetBool("all")
 
-	clusters, err := ecs.GetClusters(all)
+	clusters, err := ecs.GetClusters(context.Background(), all)
 	if err != nil {
 		return err
 	}

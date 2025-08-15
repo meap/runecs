@@ -137,13 +137,11 @@ func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, servic
 }
 
 // GetClusters returns structured data about ECS clusters, services, and optionally tasks
-func GetClusters(includeTasks bool) ([]ClusterInfo, error) {
+func GetClusters(ctx context.Context, includeTasks bool) ([]ClusterInfo, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
 	}
-
-	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 	clusterArns, err := getClusterArns(ctx, svc)

@@ -4,8 +4,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"runecs.io/v1/pkg/ecs"
@@ -32,7 +36,11 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 	return func(cmd *cobra.Command, args []string) {
 		cluster, service := parseServiceFlag()
 
-		result, err := ecs.Execute(cluster, service, args, *execWait, *dockerImageTag)
+		// Set up context that cancels on interrupt signal for proper Ctrl+C handling
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+
+		result, err := ecs.Execute(ctx, cluster, service, args, *execWait, *dockerImageTag)
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -185,13 +185,11 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 	return *output.TaskDefinition.TaskDefinitionArn, nil
 }
 
-func Deploy(cluster, service, dockerImageTag string) (*DeployResult, error) {
+func Deploy(ctx context.Context, cluster, service, dockerImageTag string) (*DeployResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
 	}
-
-	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 
@@ -340,13 +338,11 @@ func wait(ctx context.Context, cluster string, client *ecs.Client, task string) 
 	return *taskInfo.LastStatus == "STOPPED", nil
 }
 
-func Execute(cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
+func Execute(ctx context.Context, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, err
 	}
-
-	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 	logClient := cloudwatchlogs.NewFromConfig(cfg)
@@ -419,6 +415,13 @@ func Execute(cluster, service string, cmd []string, waitForCompletion bool, dock
 		var lastTimestamp *int64 = nil
 
 		for {
+			// Check for context cancellation before each iteration
+			select {
+			case <-ctx.Done():
+				return result, ctx.Err()
+			default:
+			}
+
 			logs, newTimestamp, err := getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp, logClient)
 			if err == nil {
 				result.Logs = append(result.Logs, logs...)
@@ -435,7 +438,13 @@ func Execute(cluster, service string, cmd []string, waitForCompletion bool, dock
 				break
 			}
 
-			time.Sleep(5 * time.Second)
+			// Context-aware sleep to allow immediate cancellation
+			select {
+			case <-ctx.Done():
+				return result, ctx.Err()
+			case <-time.After(5 * time.Second):
+				// Continue polling
+			}
 		}
 	}
 
@@ -630,13 +639,11 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 	return totalCount, deleted, skipped, processedTasks, nil
 }
 
-func Prune(cluster, service string, keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
+func Prune(ctx context.Context, cluster, service string, keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, err
 	}
-
-	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 
@@ -751,13 +758,12 @@ func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Cl
 	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
 }
 
-func Restart(cluster, service string, kill bool) (*RestartResult, error) {
+func Restart(ctx context.Context, cluster, service string, kill bool) (*RestartResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
 	}
 
-	ctx := context.Background()
 	svc := ecs.NewFromConfig(cfg)
 
 	result := &RestartResult{}
@@ -912,13 +918,11 @@ func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int,
 	return revisions, nil
 }
 
-func Revisions(cluster, service string, lastRevisionNr int) (*RevisionsResult, error) {
+func Revisions(ctx context.Context, cluster, service string, lastRevisionNr int) (*RevisionsResult, error) {
 	cfg, err := initCfg()
 	if err != nil {
 		return nil, err
 	}
-
-	ctx := context.Background()
 
 	svc := ecs.NewFromConfig(cfg)
 
