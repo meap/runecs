@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +27,44 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	svc := initService()
-	svc.Prune(keepLastNr, keepDays, dryRun)
+	result, err := svc.Prune(keepLastNr, keepDays, dryRun)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Display families being processed
+	fmt.Printf("Processing %d task definition families: %v\n", len(result.Families), result.Families)
+	fmt.Println()
+
+	// Display detailed task actions
+	for _, task := range result.ProcessedTasks {
+		switch task.Action {
+		case "kept":
+			fmt.Printf("Task definition %s created %d days ago is skipped (%s)\n",
+				task.Arn, task.DaysOld, task.Reason)
+		case "deleted":
+			if result.DryRun {
+				fmt.Printf("Task definition %s created %d days ago would be deregistered\n",
+					task.Arn, task.DaysOld)
+			} else {
+				fmt.Printf("Task definition %s created %d days ago is deregistered\n",
+					task.Arn, task.DaysOld)
+			}
+		case "skipped":
+			fmt.Printf("Task definition %s skipped: %s\n", task.Arn, task.Reason)
+		}
+	}
+
+	fmt.Println()
+
+	// Display summary
+	if result.DryRun {
+		fmt.Printf("Total of %d task definitions. Will delete %d definitions.\n",
+			result.TotalCount, result.DeletedCount)
+	} else {
+		fmt.Printf("Total of %d task definitions. Deleted %d definitions.\n",
+			result.TotalCount, result.DeletedCount)
+	}
 }
 
 func init() {
