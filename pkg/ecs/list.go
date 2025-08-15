@@ -32,37 +32,74 @@ type ClusterInfo struct {
 }
 
 func getClusterArns(ctx context.Context, svc *ecs.Client) ([]string, error) {
-	response, err := svc.ListClusters(ctx, &ecs.ListClustersInput{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list clusters: %w", err)
+	var clusterArns []string
+	input := &ecs.ListClustersInput{}
+
+	for {
+		response, err := svc.ListClusters(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list clusters: %w", err)
+		}
+
+		clusterArns = append(clusterArns, response.ClusterArns...)
+
+		if response.NextToken == nil {
+			break
+		}
+
+		input.NextToken = response.NextToken
 	}
 
-	return response.ClusterArns, nil
+	return clusterArns, nil
 }
 
 func getServiceArns(ctx context.Context, svc *ecs.Client, cluster string) ([]string, error) {
-	response, err := svc.ListServices(ctx, &ecs.ListServicesInput{
+	var serviceArns []string
+	input := &ecs.ListServicesInput{
 		Cluster: &cluster,
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list services in cluster %s: %w", cluster, err)
 	}
 
-	return response.ServiceArns, nil
+	for {
+		response, err := svc.ListServices(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list services in cluster %s: %w", cluster, err)
+		}
+
+		serviceArns = append(serviceArns, response.ServiceArns...)
+
+		if response.NextToken == nil {
+			break
+		}
+
+		input.NextToken = response.NextToken
+	}
+
+	return serviceArns, nil
 }
 
 func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, service string) ([]TaskInfo, error) {
-	listTasksOutput, err := svc.ListTasks(ctx, &ecs.ListTasksInput{
+	var allTaskArns []string
+	input := &ecs.ListTasksInput{
 		Cluster:     aws.String(cluster),
 		ServiceName: aws.String(service),
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to list tasks for service %s in cluster %s: %w", service, cluster, err)
 	}
 
-	arns := append([]string{}, listTasksOutput.TaskArns...)
+	for {
+		listTasksOutput, err := svc.ListTasks(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list tasks for service %s in cluster %s: %w", service, cluster, err)
+		}
+
+		allTaskArns = append(allTaskArns, listTasksOutput.TaskArns...)
+
+		if listTasksOutput.NextToken == nil {
+			break
+		}
+
+		input.NextToken = listTasksOutput.NextToken
+	}
+
+	arns := append([]string{}, allTaskArns...)
 
 	describeTasksOutput, err := svc.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 		Cluster: aws.String(cluster),
