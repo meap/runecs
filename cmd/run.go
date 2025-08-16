@@ -6,7 +6,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,7 +24,7 @@ func newRunCommand() *cobra.Command {
 		Short:                 "Execute a one-off process in an AWS ECS cluster",
 		Args:                  cobra.MinimumNArgs(1),
 		DisableFlagsInUseLine: true,
-		Run:                   runHandler(&dockerImageTag, &execWait),
+		RunE:                  runHandler(&dockerImageTag, &execWait),
 	}
 
 	cmd.PersistentFlags().BoolVarP(&execWait, "wait", "w", false, "wait for task to finish")
@@ -44,9 +43,12 @@ func parseCommandArgs(args []string) ([]string, error) {
 	return args, nil
 }
 
-func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []string) {
-	return func(cmd *cobra.Command, args []string) {
-		cluster, service := parseServiceFlag()
+func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		cluster, service, err := parseServiceFlag()
+		if err != nil {
+			return err
+		}
 
 		// Set up context that cancels on interrupt signal for proper Ctrl+C handling
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -55,17 +57,17 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 		profile := rootCmd.Flag("profile").Value.String()
 		clients, err := ecs.NewAWSClients(ctx, profile)
 		if err != nil {
-			log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+			return fmt.Errorf("failed to initialize AWS clients: %w", err)
 		}
 
 		parsedArgs, err := parseCommandArgs(args)
 		if err != nil {
-			log.Fatalf("Error parsing command arguments: %v\n", err)
+			return fmt.Errorf("error parsing command arguments: %w", err)
 		}
 
 		result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, *execWait, *dockerImageTag)
 		if err != nil {
-			log.Fatalln(err)
+			return err
 		}
 
 		// Display service loading information
@@ -93,6 +95,7 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 				fmt.Printf("Task %s finished\n", result.TaskArn)
 			}
 		}
+		return nil
 	}
 }
 

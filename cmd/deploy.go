@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,7 +20,7 @@ func newDeployCommand() *cobra.Command {
 		Short:                 "Deploy a new version of the task",
 		DisableFlagsInUseLine: true,
 		PreRunE:               deployPreRunE(&dockerImageTag),
-		Run:                   deployHandler(&dockerImageTag),
+		RunE:                  deployHandler(&dockerImageTag),
 	}
 
 	cmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
@@ -37,8 +36,8 @@ func deployPreRunE(dockerImageTag *string) func(*cobra.Command, []string) error 
 	}
 }
 
-func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
-	return func(cmd *cobra.Command, args []string) {
+func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
 		// Set up context that cancels on interrupt signal for cancellable deploy operations
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
@@ -46,17 +45,21 @@ func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
 		profile := rootCmd.Flag("profile").Value.String()
 		clients, err := ecs.NewAWSClients(ctx, profile)
 		if err != nil {
-			log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+			return fmt.Errorf("failed to initialize AWS clients: %w", err)
 		}
 
-		cluster, service := parseServiceFlag()
+		cluster, service, err := parseServiceFlag()
+		if err != nil {
+			return err
+		}
 		result, err := ecs.Deploy(ctx, clients, cluster, service, *dockerImageTag)
 		if err != nil {
-			log.Fatalf("Deploy failed: %v\n", err)
+			return fmt.Errorf("deploy failed: %w", err)
 		}
 
 		fmt.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
 		fmt.Printf("Service %s has been updated.\n", result.ServiceArn)
+		return nil
 	}
 }
 
