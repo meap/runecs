@@ -3,7 +3,6 @@ package ecs
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -131,9 +130,15 @@ func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([
 
 		services := []ServiceInfo{}
 		for _, serviceArn := range serviceArns {
-			parts := strings.Split(serviceArn, "/")
-			clusterName := parts[1]
-			serviceName := parts[2]
+			serviceName, err := extractARNResource(serviceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract service name from ARN %s: %w", serviceArn, err)
+			}
+
+			clusterName, err := extractARNResource(clusterArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract cluster name from ARN %s: %w", clusterArn, err)
+			}
 
 			service := ServiceInfo{
 				Name:        serviceName,
@@ -153,8 +158,10 @@ func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([
 		}
 
 		// Extract cluster name from ARN
-		clusterParts := strings.Split(clusterArn, "/")
-		clusterName := clusterParts[len(clusterParts)-1]
+		clusterName, err := extractARNResource(clusterArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract cluster name from ARN %s: %w", clusterArn, err)
+		}
 
 		clusters = append(clusters, ClusterInfo{
 			Name:     clusterName,
