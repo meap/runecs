@@ -148,7 +148,6 @@ runecs revisions \
 
 ## Limitations
 
-* Only FARGATE launch type is supported.
 * Sidecar containers are not supported
 
 # License

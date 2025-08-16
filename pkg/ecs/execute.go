@@ -70,7 +70,7 @@ func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (Tas
 	return output, nil
 }
 
-func wait(ctx context.Context, cluster string, client *ecs.Client, task string) (bool, error) {
+func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, task string) (bool, error) {
 	output, err := client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 		Cluster: &cluster,
 		Tasks:   []string{task},
@@ -109,6 +109,46 @@ func wait(ctx context.Context, cluster string, client *ecs.Client, task string) 
 	}
 
 	return *taskInfo.LastStatus == "STOPPED", nil
+}
+
+// waitForTaskCompletion waits for an ECS task to complete and collects its logs
+func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster string, taskArn string, tdef TaskDefinition, result *ExecuteResult) error {
+	var lastTimestamp *int64 = nil
+
+	for {
+		// Check for context cancellation before each iteration
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		logs, newTimestamp, err := getTaskLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, taskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
+		if err == nil {
+			result.Logs = append(result.Logs, logs...)
+			lastTimestamp = &newTimestamp
+		}
+
+		success, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
+		if err != nil {
+			return err
+		}
+
+		if success {
+			result.Finished = true
+			break
+		}
+
+		// Context-aware sleep to allow immediate cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+			// Continue polling
+		}
+	}
+
+	return nil
 }
 
 func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
@@ -156,7 +196,6 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	newTaskDefCreated := false
 
 	if dockerImageTag != "" {
-		// NOTE: Task cloning is not required; use the existing task definition with container overrides.
 		taskDef, err = cloneTaskDef(ctx, cluster, service, dockerImageTag, clients.ECS)
 		if err != nil {
 			return nil, err
@@ -220,39 +259,8 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	if waitForCompletion {
-		var lastTimestamp *int64 = nil
-
-		for {
-			// Check for context cancellation before each iteration
-			select {
-			case <-ctx.Done():
-				return result, ctx.Err()
-			default:
-			}
-
-			logs, newTimestamp, err := getTaskLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
-			if err == nil {
-				result.Logs = append(result.Logs, logs...)
-				lastTimestamp = &newTimestamp
-			}
-
-			success, err := wait(ctx, cluster, clients.ECS, *executedTask.TaskArn)
-			if err != nil {
-				return result, err
-			}
-
-			if success {
-				result.Finished = true
-				break
-			}
-
-			// Context-aware sleep to allow immediate cancellation
-			select {
-			case <-ctx.Done():
-				return result, ctx.Err()
-			case <-time.After(5 * time.Second):
-				// Continue polling
-			}
+		if err := waitForTaskCompletion(ctx, clients, cluster, *executedTask.TaskArn, tdef, result); err != nil {
+			return result, err
 		}
 	}
 
