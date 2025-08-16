@@ -25,13 +25,18 @@ import (
 )
 
 // NewAWSClients creates and initializes AWS service clients with shared configuration
-func NewAWSClients() (*AWSClients, error) {
+func NewAWSClients(profile string) (*AWSClients, error) {
 	configFunctions := []func(*config.LoadOptions) error{
 		config.WithRetryer(func() aws.Retryer {
 			return retry.NewStandard(func(o *retry.StandardOptions) {
 				o.MaxAttempts = defaultNumberOfRetries
 			})
 		}),
+	}
+
+	// Add profile configuration if specified
+	if profile != "" {
+		configFunctions = append(configFunctions, config.WithSharedConfigProfile(profile))
 	}
 
 	cfg, err := config.LoadDefaultConfig(context.Background(), configFunctions...)

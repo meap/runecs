@@ -50,6 +50,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.PersistentFlags().String("service", "", "service name (cluster/service)")
+	rootCmd.PersistentFlags().String("profile", "", "AWS profile to use for credentials")
 }
 
 func parseServiceFlag() (cluster, service string) {
