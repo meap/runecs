@@ -1,80 +1,114 @@
+// Copyright (c) Petr Reichl and affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package ecs
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/dustin/go-humanize"
 )
 
-func (s *Service) stopAll(ctx context.Context, client *ecs.Client) error {
+func stopAll(ctx context.Context, cluster, service string, client *ecs.Client) ([]StoppedTaskInfo, error) {
 	tasks, err := client.ListTasks(ctx, &ecs.ListTasksInput{
-		Cluster:     &s.Cluster,
-		ServiceName: &s.Service,
+		Cluster:     &cluster,
+		ServiceName: &service,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var stoppedTasks []StoppedTaskInfo
 	for _, taskArn := range tasks.TaskArns {
 		output, err := client.StopTask(ctx, &ecs.StopTaskInput{
-			Cluster: &s.Cluster,
+			Cluster: &cluster,
 			Task:    &taskArn,
 		})
 		if err != nil {
-			log.Println(fmt.Errorf("failed to stop task %s. (%w)", taskArn, err))
-
+			// Continue with other tasks but log this error
 			continue
 		}
 
-		fmt.Printf("Stopped task %s started %s\n", *output.Task.TaskArn, humanize.Time(*output.Task.StartedAt))
+		if output.Task == nil {
+			continue
+		}
+
+		if output.Task.TaskArn == nil || output.Task.StartedAt == nil {
+			continue
+		}
+
+		stoppedTasks = append(stoppedTasks, StoppedTaskInfo{
+			TaskArn:   *output.Task.TaskArn,
+			StartedAt: *output.Task.StartedAt,
+		})
 	}
 
-	return nil
+	return stoppedTasks, nil
 }
 
-func (s *Service) forceNewDeploy(ctx context.Context, client *ecs.Client) error {
-	taskDef, err := s.latestTaskDefinitionArn(ctx, client)
+func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Client) (string, string, error) {
+	taskDef, err := latestTaskDefinitionArn(ctx, cluster, service, client)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	output, err := client.UpdateService(ctx, &ecs.UpdateServiceInput{
-		Cluster:            &s.Cluster,
-		Service:            &s.Service,
+		Cluster:            &cluster,
+		Service:            &service,
 		TaskDefinition:     &taskDef,
 		ForceNewDeployment: true,
 	})
 
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	fmt.Printf("Service %s restarted by starting new tasks using the task definition %s.\n", s.Service, *output.Service.TaskDefinition)
+	if output.Service == nil {
+		return "", "", errors.New("invalid service update response: missing service")
+	}
 
-	return nil
+	if output.Service.ServiceArn == nil {
+		return "", "", errors.New("invalid service update response: missing service ARN")
+	}
+
+	if output.Service.TaskDefinition == nil {
+		return "", "", errors.New("invalid service update response: missing task definition")
+	}
+
+	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
 }
 
-func (s *Service) Restart(kill bool) {
-	cfg, err := initCfg()
-	if err != nil {
-		log.Fatalln(err)
-	}
+func Restart(ctx context.Context, clients *AWSClients, cluster, service string, kill bool) (*RestartResult, error) {
+	result := &RestartResult{}
 
-	svc := ecs.NewFromConfig(cfg)
 	if kill {
-		err := s.stopAll(context.Background(), svc)
+		result.Method = "kill"
+		stoppedTasks, err := stopAll(ctx, cluster, service, clients.ECS)
 		if err != nil {
-			log.Fatalln(err)
+			return nil, fmt.Errorf("failed to stop tasks: %w", err)
 		}
+		result.StoppedTasks = stoppedTasks
 	} else {
-		err := s.forceNewDeploy(context.Background(), svc)
+		result.Method = "force_deploy"
+		serviceArn, taskDefinition, err := forceNewDeploy(ctx, cluster, service, clients.ECS)
 		if err != nil {
-			log.Fatalln(err)
+			return nil, fmt.Errorf("failed to force new deployment: %w", err)
 		}
+		result.ServiceArn = serviceArn
+		result.TaskDefinition = taskDefinition
 	}
 
-	fmt.Println("Done.")
+	return result, nil
 }

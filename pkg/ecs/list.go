@@ -3,115 +3,171 @@ package ecs
 import (
 	"context"
 	"fmt"
-	"log"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-func listClusters(ctx context.Context, svc *ecs.Client) []string {
-	response, err := svc.ListClusters(ctx, &ecs.ListClustersInput{})
-	if err != nil {
-		log.Println(fmt.Errorf("failed to list clusters. (%w)", err))
+func getClusterArns(ctx context.Context, svc *ecs.Client) ([]string, error) {
+	var clusterArns []string
+	input := &ecs.ListClustersInput{}
 
-		return []string{}
+	for {
+		response, err := svc.ListClusters(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list clusters: %w", err)
+		}
+
+		clusterArns = append(clusterArns, response.ClusterArns...)
+
+		if response.NextToken == nil {
+			break
+		}
+
+		input.NextToken = response.NextToken
 	}
 
-	return response.ClusterArns
+	return clusterArns, nil
 }
 
-func listServices(ctx context.Context, svc *ecs.Client, cluster string) []string {
-	response, err := svc.ListServices(ctx, &ecs.ListServicesInput{
+func getServiceArns(ctx context.Context, svc *ecs.Client, cluster string) ([]string, error) {
+	var serviceArns []string
+	input := &ecs.ListServicesInput{
 		Cluster: &cluster,
-	})
-
-	if err != nil {
-		log.Println(fmt.Errorf("failed to list services in cluster %s. (%w)", cluster, err))
-
-		return []string{}
 	}
 
-	return response.ServiceArns
+	for {
+		response, err := svc.ListServices(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list services in cluster %s: %w", cluster, err)
+		}
+
+		serviceArns = append(serviceArns, response.ServiceArns...)
+
+		if response.NextToken == nil {
+			break
+		}
+
+		input.NextToken = response.NextToken
+	}
+
+	return serviceArns, nil
 }
 
-func listTasks(ctx context.Context, svc *ecs.Client, cluster string, service string) []string {
-	listTasksOutput, err := svc.ListTasks(ctx, &ecs.ListTasksInput{
+func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, service string) ([]TaskInfo, error) {
+	var allTaskArns []string
+	input := &ecs.ListTasksInput{
 		Cluster:     aws.String(cluster),
 		ServiceName: aws.String(service),
-	})
-
-	if err != nil {
-		log.Printf("failed to list tasks for service %s in cluster %s. (%v)", service, cluster, err)
-
-		return []string{}
 	}
 
-	arns := []string{}
-	for _, taskArn := range listTasksOutput.TaskArns {
-		arns = append(arns, taskArn)
+	for {
+		listTasksOutput, err := svc.ListTasks(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list tasks for service %s in cluster %s: %w", service, cluster, err)
+		}
+
+		allTaskArns = append(allTaskArns, listTasksOutput.TaskArns...)
+
+		if listTasksOutput.NextToken == nil {
+			break
+		}
+
+		input.NextToken = listTasksOutput.NextToken
 	}
+
+	arns := append([]string{}, allTaskArns...)
 
 	describeTasksOutput, err := svc.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 		Cluster: aws.String(cluster),
 		Tasks:   arns,
 	})
 	if err != nil {
-		log.Printf("failed to describe tasks for service %s in cluster %s. (%v)", service, cluster, err)
-
-		return []string{}
+		return nil, fmt.Errorf("failed to describe tasks for service %s in cluster %s: %w", service, cluster, err)
 	}
 
-	output := []string{}
+	tasks := []TaskInfo{}
 	for _, task := range describeTasksOutput.Tasks {
 		// Výpočet délky běhu úlohy
 		var runningTime string
 		if task.StartedAt != nil {
 			duration := time.Since(*task.StartedAt)
-			runningTime = fmt.Sprintf("%dh %dm %ds", int(duration.Hours()), int(duration.Minutes())%60, int(duration.Seconds())%60)
+			runningTime = formatRunningTime(duration)
 		} else {
 			runningTime = "Unknown"
 		}
 
-		taskID := extractLastPart(*task.TaskArn)
+		taskID, err := extractARNResource(*task.TaskArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract task ID from ARN: %w", err)
+		}
 
-		output = append(output, fmt.Sprintf(
-			"%s: %s (Cpu) / %s (Memory) (Running for: %s)",
-			taskID,
-			*task.Cpu,
-			*task.Memory,
-			runningTime,
-		))
+		tasks = append(tasks, TaskInfo{
+			ID:          taskID,
+			CPU:         *task.Cpu,
+			Memory:      *task.Memory,
+			RunningTime: runningTime,
+		})
 	}
 
-	return output
+	return tasks, nil
 }
 
-func List(includeTasks bool) {
-	cfg, err := initCfg()
+// GetClusters returns structured data about ECS clusters, services, and optionally tasks
+func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([]ClusterInfo, error) {
+	clusterArns, err := getClusterArns(ctx, clients.ECS)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
-	ctx := context.Background()
-
-	svc := ecs.NewFromConfig(cfg)
-	clusters := listClusters(ctx, svc)
-
-	for _, clusterArn := range clusters {
-		services := listServices(ctx, svc, clusterArn)
-		for _, serviceArn := range services {
-			parts := strings.Split(serviceArn, "/")
-			link := fmt.Sprintf("%s/%s", parts[1], parts[2])
-			tasks := listTasks(ctx, svc, parts[1], parts[2])
-
-			fmt.Println(link)
-			if includeTasks {
-				for _, task := range tasks {
-					fmt.Printf("  %s\n", task)
-				}
-			}
+	clusters := []ClusterInfo{}
+	for _, clusterArn := range clusterArns {
+		serviceArns, err := getServiceArns(ctx, clients.ECS, clusterArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list services for cluster %s: %w", clusterArn, err)
 		}
+
+		services := []ServiceInfo{}
+		for _, serviceArn := range serviceArns {
+			serviceName, err := extractARNResource(serviceArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract service name from ARN %s: %w", serviceArn, err)
+			}
+
+			clusterName, err := extractARNResource(clusterArn)
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract cluster name from ARN %s: %w", clusterArn, err)
+			}
+
+			service := ServiceInfo{
+				Name:        serviceName,
+				ClusterName: clusterName,
+				Tasks:       []TaskInfo{},
+			}
+
+			if includeTasks {
+				tasks, err := getTaskDetails(ctx, clients.ECS, clusterName, serviceName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to list tasks for service %s/%s: %w", clusterName, serviceName, err)
+				}
+				service.Tasks = tasks
+			}
+
+			services = append(services, service)
+		}
+
+		// Extract cluster name from ARN
+		clusterName, err := extractARNResource(clusterArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract cluster name from ARN %s: %w", clusterArn, err)
+		}
+
+		clusters = append(clusters, ClusterInfo{
+			Name:     clusterName,
+			Services: services,
+		})
 	}
+
+	return clusters, nil
 }

@@ -1,16 +1,28 @@
+// Copyright (c) Petr Reichl and affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package ecs
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
-func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) {
+func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keepDays int, dryRun bool, svc *ecs.Client) (int, int, int, []TaskDefinitionPruneEntry, error) {
 	definitionInput := &ecs.ListTaskDefinitionsInput{
 		FamilyPrefix: &family,
 		Sort:         types.SortOrderDesc,
@@ -20,11 +32,12 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 	totalCount := 0
 	deleted := 0
 	keep := 0
+	var processedTasks []TaskDefinitionPruneEntry
 
 	for {
 		resp, err := svc.ListTaskDefinitions(ctx, definitionInput)
 		if err != nil {
-			log.Fatalln("Loading the list of definitions failed.")
+			return 0, 0, 0, nil, fmt.Errorf("loading the list of definitions failed: %w", err)
 		}
 
 		count := len(resp.TaskDefinitionArns)
@@ -36,8 +49,24 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 			})
 
 			if err != nil {
-				log.Printf("Failed to describe task definition %s. (%v)\n", def, err)
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: -1,
+					Action:  "skipped",
+					Reason:  fmt.Sprintf("Failed to describe: %v", err),
+					Family:  family,
+				})
+				continue
+			}
 
+			if response.TaskDefinition.RegisteredAt == nil {
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: -1,
+					Action:  "skipped",
+					Reason:  "Missing registration date",
+					Family:  family,
+				})
 				continue
 			}
 
@@ -45,15 +74,25 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 
 			// Last X
 			if keep < keepLast {
-				fmt.Println("Task definition", def, "created", diffInDays, "days ago is skipped.")
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: diffInDays,
+					Action:  "kept",
+					Reason:  fmt.Sprintf("keeping last %d definitions", keepLast),
+					Family:  family,
+				})
 				keep++
-
 				continue
 			}
 
 			if diffInDays < keepDays {
-				fmt.Println("Task definition", def, "created", diffInDays, "days ago is skipped.")
-
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: diffInDays,
+					Action:  "kept",
+					Reason:  fmt.Sprintf("newer than %d days", keepDays),
+					Family:  family,
+				})
 				continue
 			}
 
@@ -62,12 +101,32 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 			if !dryRun {
 				_, err := svc.DeregisterTaskDefinition(ctx, &ecs.DeregisterTaskDefinitionInput{TaskDefinition: &def})
 				if err != nil {
-					fmt.Printf("Deregistering the task definition %s failed. (%v)\n", def, err)
-
+					processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+						Arn:     def,
+						DaysOld: diffInDays,
+						Action:  "skipped",
+						Reason:  fmt.Sprintf("deregistration failed: %v", err),
+						Family:  family,
+					})
+					deleted-- // Decrement since it wasn't actually deleted
 					continue
 				}
 
-				fmt.Println("Task definition", def, "created", diffInDays, "days ago is deregistered.")
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: diffInDays,
+					Action:  "deleted",
+					Reason:  "deregistered successfully",
+					Family:  family,
+				})
+			} else {
+				processedTasks = append(processedTasks, TaskDefinitionPruneEntry{
+					Arn:     def,
+					DaysOld: diffInDays,
+					Action:  "deleted",
+					Reason:  "dry run - would be deleted",
+					Family:  family,
+				})
 			}
 		}
 
@@ -78,36 +137,45 @@ func (s *Service) deregisterTaskFamily(ctx context.Context, family string, keepL
 		definitionInput.NextToken = resp.NextToken
 	}
 
-	if dryRun {
-		fmt.Printf("Total of %d task definitions. Will delete %d definitions.", totalCount, deleted)
-
-		return
-	}
-
-	fmt.Printf("Total of %d task definitions. Deleted %d definitions.", totalCount, deleted)
+	skipped := totalCount - deleted - keep
+	return totalCount, deleted, skipped, processedTasks, nil
 }
 
-func (s *Service) Prune(keepLast int, keepDays int, dryRun bool) {
-	cfg, err := initCfg()
+func Prune(ctx context.Context, clients *AWSClients, cluster, service string, keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
+	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, clients.ECS)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
-	ctx := context.Background()
-
-	svc := ecs.NewFromConfig(cfg)
-
-	familyPrefix, err := s.getFamilyPrefix(ctx, svc)
+	families, err := getFamilies(ctx, familyPrefix, clients.ECS)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
-	response, err := s.getFamilies(ctx, familyPrefix, svc)
-	if err != nil {
-		log.Fatalln(err)
+	result := &PruneResult{
+		Families:       families,
+		TotalCount:     0,
+		DeletedCount:   0,
+		KeptCount:      0,
+		SkippedCount:   0,
+		DryRun:         dryRun,
+		ProcessedTasks: []TaskDefinitionPruneEntry{},
 	}
 
-	for _, family := range response {
-		s.deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, svc)
+	for _, family := range families {
+		totalCount, deletedCount, skippedCount, processedTasks, err := deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, clients.ECS)
+		if err != nil {
+			return nil, err
+		}
+
+		result.TotalCount += totalCount
+		result.DeletedCount += deletedCount
+		result.SkippedCount += skippedCount
+		result.ProcessedTasks = append(result.ProcessedTasks, processedTasks...)
 	}
+
+	// Calculate kept count
+	result.KeptCount = result.TotalCount - result.DeletedCount - result.SkippedCount
+
+	return result, nil
 }
