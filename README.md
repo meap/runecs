@@ -70,6 +70,16 @@ runecs run "echo \"HELLO WORLD\"" -w --service mycanvas-ecs-staging-cluster/web
 
 Both AWS Fargate and EC2 capacity providers are supported, with the appropriate launch type being automatically selected based on service configuration. When the `-w` flag is used, task completion is awaited and full output is streamed to the terminal, making it ideal for interactive debugging and migration scripts.
 
+### Scale ECS Services
+
+The desired count of tasks for an ECS service can be adjusted instantly:
+
+```bash
+runecs scale 5 --service mycanvas-ecs-staging-cluster/web
+```
+
+This command directly modifies the service's desired count using `UpdateService`, providing immediate scaling without creating task sets or managing deployment configurations.
+
 ### Restart ECS Services
 
 ECS services can be gracefully restarted without downtime, or immediate task termination can be forced when required:
