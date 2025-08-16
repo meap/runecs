@@ -1,13 +1,11 @@
 <div align="center">
 
-<img width="106px" alt="elastic container service logo" src="images/amazon_ecs-icon.svg">
+# run(ECS)
 
-# RunECS CLI - Simplified AWS ECS Run Task Wrapper
+<p align="center">Effortlessly run tasks and manage your services on AWS ECS.</p>
 
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/meap/runecs?logo=GitHub)](https://github.com/meap/runecs/releases)
+[![GitHub release (**latest** by date)](https://img.shields.io/github/v/release/meap/runecs?logo=GitHub)](https://github.com/meap/runecs/releases)
 [![GitHub all releases](https://img.shields.io/github/downloads/meap/runecs/total?label=all%20time%20downloads)](https://github.com/meap/runecs/releases/)
-
-RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster. A developer-friendly wrapper for the AWS ECS run task command.
 
 </div>
 
@@ -15,142 +13,62 @@ RunECS: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS C
     <img src="./images/demo.gif" width="100%" alt="RunECS - Simplified AWS ECS run task demonstration">
 </p>
 
-## What is RunECS?
+---
 
-RunECS is a command-line tool that simplifies running one-off tasks in Amazon ECS (Elastic Container Service). It wraps the standard `aws ecs run-task` command functionality with a more developer-friendly interface, providing intuitive commands for common ECS operations while leveraging AWS's underlying infrastructure.
+## Installation
 
-# Install
+RunECS is a cross-platform tool available for macOS, Linux, and Windows.
 
-## 🍺 Homebrew
+```bash
+# Install via Homebrew (macOS/Linux)
+brew install meap/runecs/runecs
 
-```shell
-brew tap meap/runecs
-brew install runecs
+# Or install from source
+go install github.com/meap/runecs@latest
 ```
 
-## Using Docker
+Pre-compiled binaries for all platforms are available on our [releases page](https://github.com/meap/runecs/releases).
 
-The easiest way to get started with runecs using Docker is by running this command.
+## Configuration
 
-```
-docker run \
-  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-  -e AWS_REGION=$AWS_REGION \
-  preichl/runecs list
-```
+### AWS Credentials
 
-> Note: You have to pass the environment variables with AWS credentials. I recommend using [direnv](https://direnv.net/) which I mentioned in the [introduction post](https://dev.to/preichl/streamline-your-ecs-workflow-easy-database-migrations-with-a-runecs-cli-tool-5d2h).
+AWS credential configuration through environment variables is supported as documented in the [AWS CLI Environment Variables guide](https://docs.aws.amazon.com/cli/v1/userguide/cli-configure-envvars.html). This approach integrates seamlessly with tools like [direnv](https://direnv.net/), enabling distinct AWS account configurations, regions, and other settings to be maintained on a per-directory or per-project basis. Multiple AWS environments can be managed effectively without the need for constant profile switching.
 
-## 📦 Other way
+## Key Features
 
-Download the binary file for your platform, [see releases](https://github.com/meap/runecs/releases).
+A complete list of available commands can be obtained by running `runecs --help`. Common use cases are demonstrated below.
 
+### Deploy a Specific Docker Image Tag
 
-# How to Use
+A specific Docker image tag or commit SHA can be deployed to an ECS service. This functionality is particularly useful when rollbacks to known-good versions are required or when specific builds need to be deployed:
 
-RunECS simplifies the process of executing commands using AWS ECS run task functionality. The service must be specified in `cluster/service` format. Further, you must specify the environment variables that determine access to AWS.
-
-```
-export AWS_ACCESS_KEY_ID=xxxxxx
-export AWS_SECRET_ACCESS_KEY=xxxxxxx
-export AWS_REGION=eu-east1
-
-runecs rake orders:upload[14021] --service my-cluster/my-service -w
+```bash
+runecs deploy --service mycanvas-ecs-staging-cluster/web -i 9cd43549f03faf9bbc0ddc3eba8585f00098b240
 ```
 
-## Commands
+### Run One-Off Commands in ECS
 
-### Run (AWS ECS Run Task Made Simple)
+One-off commands can be executed directly in the ECS environment, making it ideal for database migrations, maintenance tasks, or debugging within configured VPC and security groups. Commands are executed with the same network access, environment variables, and IAM permissions as the services:
 
-The `run` command is a streamlined wrapper around the AWS ECS run task API. It executes the process using the last available task definition. You can pick a specific docker tag by using the `--image-tag` argument. In this case, it changes the task definition and inserts the specified docker tag. 
-
-The task is run asynchronously by default. Using the `--wait` argument, the task starts synchronously and returns the EXIT code of the container.
-
-Executing a one-off process asynchronously:
-
-```shell
-runecs run rake db:migrate \
-  --service my-cluster/my-service \
-  --image-tag latest
+```bash
+runecs run "echo \"HELLO WORLD\"" -w --service mycanvas-ecs-staging-cluster/web
 ```
 
-Executing a one-off process synchronously:
+Both AWS Fargate and EC2 capacity providers are supported, with the appropriate launch type being automatically selected based on service configuration. When the `-w` flag is used, task completion is awaited and full output is streamed to the terminal, making it ideal for interactive debugging and migration scripts.
 
-```shell
-runecs run rake db:migrate \
-  --service my-cluster/my-service \
-  --image-tag latest \
-  --wait
+### Restart ECS Services
+
+ECS services can be gracefully restarted without downtime, or immediate task termination can be forced when required:
+
+```bash
+runecs restart --service mycanvas-ecs-staging-cluster/addrp
 ```
 
-### List
+By default, a rolling restart is performed, with tasks being replaced one by one to maintain service availability. For situations where immediate task termination is required (such as clearing stuck processes or forcing configuration reloads), the `--kill` flag can be used to terminate all tasks at once, allowing replacements to be spawned according to the service's desired count.
 
-The main parameter is the name of the ECS service within which the command is to be executed. The parameter value consists of the cluster name and its service. To make it easier, we have introduced a command **list** that lists all these services in the specified region.
+## FAQ
 
-```shell
-runecs list
-```
+#### How does this differ from AWS CLI?
 
-To include the tasks of each service in the output, use the `--all` parameter. This will display the tasks currently running in each service.
-
-```shell
-runecs list --all
-```
-
-### Restart
-
-Restarts all running tasks in the service.
-
-```shell
-runecs restart --service my-cluster/myservice
-```
-
-The services restart without downtime. The command initiates new tasks using the last definition. After reaching the running state, ECS automatically shuts down old tasks to achieve the desired number of running tasks.
-
-Another option is to use the `--kill` parameter, which shuts down running tasks in the service. If the service has health checks set up properly, ECS automatically starts new tasks to ensure that the desired number of tasks are running.
-
-```shell
-runecs restart --service my-cluster/myservice --kill
-```
-
-### Prune
-
-[Deregisters](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_DeregisterTaskDefinition.html) old task definitions.
-
-Use `--keep-last` and `--keep-days` to ensure that a certain number of definitions are always available.
-
-```shell
-runecs prune \
-  --service my-cluster/my-service \
-  --keep-last 10 --keep-days 5
-```
-
-### Deploy
-
-Creates a new task definition with the specified image tag and updates the service to use the created task definition for new tasks.
-
-```shell
-runecs deploy \
-  --service my-cluster/my-service \
-  --image-tag latest
-```
-
-### Revisions
-
-Prints a list of revisions of the task definition. Sorted from newest to oldest. Displays the Docker image URI used in the revision.
-
-```shell
-runecs revisions \
-  --service my-cluster/my-service \
-  --last 10
-```
-
-## Limitations
-
-* Only FARGATE launch type is supported.
-* Sidecar containers are not supported
-
-# License
-
-RunECS is distributed under [Apache-2.0 license](https://github.com/meap/runecs/blob/main/LICENSE)
+While AWS CLI offers comprehensive control over ECS clusters, its extensive feature set can introduce significant complexity for everyday tasks. RunECS streamlines common ECS operations by focusing on the workflows developers use most frequently, providing an intuitive and efficient command-line experience without sacrificing functionality.

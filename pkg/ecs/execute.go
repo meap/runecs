@@ -23,43 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 )
 
-func describeService(ctx context.Context, cluster, service string, client *ecs.Client) (ServiceDefinition, error) {
-	resp, err := client.DescribeServices(ctx, &ecs.DescribeServicesInput{
-		Cluster:  &cluster,
-		Services: []string{service},
-	})
-
-	if err != nil {
-		return ServiceDefinition{}, err
-	}
-
-	serviceInfo, err := safeGetFirstPtr(resp.Services, "no services found in response")
-	if err != nil {
-		return ServiceDefinition{}, fmt.Errorf("failed to get service information: %w", err)
-	}
-
-	// Fetch the latest task definition. Keep in mind that the active service may
-	// have a different task definition that is available, see. *serviceInfo.TaskDefinition
-	taskDef, err := latestTaskDefinitionArn(ctx, cluster, service, client)
-	if err != nil {
-		return ServiceDefinition{}, err
-	}
-
-	// Check for required network configuration
-	if serviceInfo.NetworkConfiguration == nil {
-		return ServiceDefinition{}, errors.New("service has no network configuration")
-	}
-	if serviceInfo.NetworkConfiguration.AwsvpcConfiguration == nil {
-		return ServiceDefinition{}, errors.New("service has no AWSVPC configuration")
-	}
-
-	return ServiceDefinition{
-		Subnets:        serviceInfo.NetworkConfiguration.AwsvpcConfiguration.Subnets,
-		SecurityGroups: serviceInfo.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups,
-		TaskDef:        taskDef,
-	}, nil
-}
-
 func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
 	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 	if err != nil {
@@ -94,10 +57,20 @@ func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (Tas
 	output.Cpu = *resp.TaskDefinition.Cpu
 	output.Memory = *resp.TaskDefinition.Memory
 
+	// Extract RequiresCompatibilities - required field
+	if len(resp.TaskDefinition.RequiresCompatibilities) == 0 {
+		return TaskDefinition{}, fmt.Errorf("task definition has no compatibility requirements: %s", *taskArn)
+	}
+	compatibilities := make([]string, len(resp.TaskDefinition.RequiresCompatibilities))
+	for i, compat := range resp.TaskDefinition.RequiresCompatibilities {
+		compatibilities[i] = string(compat)
+	}
+	output.RequiresCompatibilities = compatibilities
+
 	return output, nil
 }
 
-func wait(ctx context.Context, cluster string, client *ecs.Client, task string) (bool, error) {
+func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, task string) (bool, error) {
 	output, err := client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 		Cluster: &cluster,
 		Tasks:   []string{task},
@@ -138,15 +111,85 @@ func wait(ctx context.Context, cluster string, client *ecs.Client, task string) 
 	return *taskInfo.LastStatus == "STOPPED", nil
 }
 
-func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
-	sdef, err := describeService(ctx, cluster, service, clients.ECS)
-	if err != nil {
-		return nil, fmt.Errorf("error loading service %s in cluster %s: %w", service, cluster, err)
+// waitForTaskCompletion waits for an ECS task to complete and collects its logs
+func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster string, taskArn string, tdef TaskDefinition, result *ExecuteResult) error {
+	var lastTimestamp *int64 = nil
+
+	for {
+		// Check for context cancellation before each iteration
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		logs, newTimestamp, err := getTaskLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, taskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
+		if err == nil {
+			result.Logs = append(result.Logs, logs...)
+			lastTimestamp = &newTimestamp
+		}
+
+		success, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
+		if err != nil {
+			return err
+		}
+
+		if success {
+			result.Finished = true
+			break
+		}
+
+		// Context-aware sleep to allow immediate cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Second):
+			// Continue polling
+		}
 	}
 
-	tdef, err := describeTask(ctx, clients.ECS, &sdef.TaskDef)
+	return nil
+}
+
+func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
+	// Describe the service to get its configuration
+	resp, err := clients.ECS.DescribeServices(ctx, &ecs.DescribeServicesInput{
+		Cluster:  &cluster,
+		Services: []string{service},
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error loading task definition %s: %w", sdef.TaskDef, err)
+		return nil, fmt.Errorf("error describing service %s in cluster %s: %w", service, cluster, err)
+	}
+
+	serviceInfo, err := safeGetFirstPtr(resp.Services, "no services found in response")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service information: %w", err)
+	}
+
+	// Fetch the latest task definition
+	latestTaskDefArn, err := latestTaskDefinitionArn(ctx, cluster, service, clients.ECS)
+	if err != nil {
+		return nil, fmt.Errorf("error getting task definition for service %s: %w", service, err)
+	}
+
+	// Extract network configuration if available
+	taskDefArn := latestTaskDefArn
+	var subnets []string
+	var securityGroups []string
+	if serviceInfo.NetworkConfiguration != nil && serviceInfo.NetworkConfiguration.AwsvpcConfiguration != nil {
+		subnets = serviceInfo.NetworkConfiguration.AwsvpcConfiguration.Subnets
+		securityGroups = serviceInfo.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups
+	}
+
+	// Extract capacity provider strategy if available
+	var capacityProviderStrategy []types.CapacityProviderStrategyItem
+	if len(serviceInfo.CapacityProviderStrategy) > 0 {
+		capacityProviderStrategy = serviceInfo.CapacityProviderStrategy
+	}
+
+	tdef, err := describeTask(ctx, clients.ECS, &taskDefArn)
+	if err != nil {
+		return nil, fmt.Errorf("error loading task definition %s: %w", taskDefArn, err)
 	}
 
 	var taskDef string
@@ -159,27 +202,39 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 		}
 		newTaskDefCreated = true
 	} else {
-		taskDef = sdef.TaskDef
+		taskDef = taskDefArn
 	}
 
-	output, err := clients.ECS.RunTask(ctx, &ecs.RunTaskInput{
+	runTaskInput := &ecs.RunTaskInput{
 		Cluster:        &cluster,
 		TaskDefinition: &taskDef,
-		LaunchType:     "FARGATE",
-		NetworkConfiguration: &types.NetworkConfiguration{
-			AwsvpcConfiguration: &types.AwsVpcConfiguration{
-				Subnets:        sdef.Subnets,
-				SecurityGroups: sdef.SecurityGroups,
-				AssignPublicIp: "ENABLED", // FIXME: Public IP is not needed (mostly)
-			},
-		},
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{{
 				Name:    &tdef.Name,
 				Command: cmd,
 			}},
 		},
-	})
+	}
+
+	// Use CapacityProviderStrategy if available, otherwise use LaunchType
+	if len(capacityProviderStrategy) > 0 {
+		runTaskInput.CapacityProviderStrategy = capacityProviderStrategy
+	} else {
+		runTaskInput.LaunchType = types.LaunchType(tdef.RequiresCompatibilities[0])
+	}
+
+	// Only set NetworkConfiguration if service has network configuration
+	if len(subnets) > 0 || len(securityGroups) > 0 {
+		runTaskInput.NetworkConfiguration = &types.NetworkConfiguration{
+			AwsvpcConfiguration: &types.AwsVpcConfiguration{
+				Subnets:        subnets,
+				SecurityGroups: securityGroups,
+				AssignPublicIp: "ENABLED", // FIXME: Public IP is not needed (mostly)
+			},
+		}
+	}
+
+	output, err := clients.ECS.RunTask(ctx, runTaskInput)
 
 	if err != nil {
 		return nil, err
@@ -204,39 +259,8 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	if waitForCompletion {
-		var lastTimestamp *int64 = nil
-
-		for {
-			// Check for context cancellation before each iteration
-			select {
-			case <-ctx.Done():
-				return result, ctx.Err()
-			default:
-			}
-
-			logs, newTimestamp, err := getTaskLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
-			if err == nil {
-				result.Logs = append(result.Logs, logs...)
-				lastTimestamp = &newTimestamp
-			}
-
-			success, err := wait(ctx, cluster, clients.ECS, *executedTask.TaskArn)
-			if err != nil {
-				return result, err
-			}
-
-			if success {
-				result.Finished = true
-				break
-			}
-
-			// Context-aware sleep to allow immediate cancellation
-			select {
-			case <-ctx.Done():
-				return result, ctx.Err()
-			case <-time.After(5 * time.Second):
-				// Continue polling
-			}
+		if err := waitForTaskCompletion(ctx, clients, cluster, *executedTask.TaskArn, tdef, result); err != nil {
+			return result, err
 		}
 	}
 

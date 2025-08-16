@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/buildkite/shellwords"
 	"github.com/spf13/cobra"
 	"runecs.io/v1/pkg/ecs"
 )
@@ -32,6 +33,17 @@ func newRunCommand() *cobra.Command {
 	return cmd
 }
 
+func parseCommandArgs(args []string) ([]string, error) {
+	if len(args) == 1 {
+		parsed, err := shellwords.Split(args[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse command: %w", err)
+		}
+		return parsed, nil
+	}
+	return args, nil
+}
+
 func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		cluster, service := parseServiceFlag()
@@ -45,7 +57,12 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 			log.Fatalf("Failed to initialize AWS clients: %v\n", err)
 		}
 
-		result, err := ecs.Execute(ctx, clients, cluster, service, args, *execWait, *dockerImageTag)
+		parsedArgs, err := parseCommandArgs(args)
+		if err != nil {
+			log.Fatalf("Error parsing command arguments: %v\n", err)
+		}
+
+		result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, *execWait, *dockerImageTag)
 		if err != nil {
 			log.Fatalln(err)
 		}

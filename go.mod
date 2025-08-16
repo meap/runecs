@@ -1,8 +1,6 @@
 module runecs.io/v1
 
-go 1.21.0
-
-toolchain go1.23.0
+go 1.24.3
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.1
@@ -20,6 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.14 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/buildkite/shellwords v1.0.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
