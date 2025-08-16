@@ -137,21 +137,15 @@ func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, servic
 }
 
 // GetClusters returns structured data about ECS clusters, services, and optionally tasks
-func GetClusters(ctx context.Context, includeTasks bool) ([]ClusterInfo, error) {
-	cfg, err := initCfg()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
-	}
-
-	svc := ecs.NewFromConfig(cfg)
-	clusterArns, err := getClusterArns(ctx, svc)
+func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([]ClusterInfo, error) {
+	clusterArns, err := getClusterArns(ctx, clients.ECS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
 	clusters := []ClusterInfo{}
 	for _, clusterArn := range clusterArns {
-		serviceArns, err := getServiceArns(ctx, svc, clusterArn)
+		serviceArns, err := getServiceArns(ctx, clients.ECS, clusterArn)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list services for cluster %s: %w", clusterArn, err)
 		}
@@ -169,7 +163,7 @@ func GetClusters(ctx context.Context, includeTasks bool) ([]ClusterInfo, error) 
 			}
 
 			if includeTasks {
-				tasks, err := getTaskDetails(ctx, svc, clusterName, serviceName)
+				tasks, err := getTaskDetails(ctx, clients.ECS, clusterName, serviceName)
 				if err != nil {
 					return nil, fmt.Errorf("failed to list tasks for service %s/%s: %w", clusterName, serviceName, err)
 				}

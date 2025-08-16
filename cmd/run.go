@@ -40,7 +40,12 @@ func runHandler(dockerImageTag *string, execWait *bool) func(*cobra.Command, []s
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 
-		result, err := ecs.Execute(ctx, cluster, service, args, *execWait, *dockerImageTag)
+		clients, err := ecs.NewAWSClients()
+		if err != nil {
+			log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+		}
+
+		result, err := ecs.Execute(ctx, clients, cluster, service, args, *execWait, *dockerImageTag)
 		if err != nil {
 			log.Fatalln(err)
 		}

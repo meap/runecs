@@ -38,8 +38,13 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	clients, err := ecs.NewAWSClients()
+	if err != nil {
+		log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+	}
+
 	cluster, service := parseServiceFlag()
-	result, err := ecs.Revisions(ctx, cluster, service, revNr)
+	result, err := ecs.Revisions(ctx, clients, cluster, service, revNr)
 	if err != nil {
 		log.Fatalln(err)
 	}

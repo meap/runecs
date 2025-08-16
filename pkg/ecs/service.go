@@ -109,11 +109,18 @@ type PruneResult struct {
 	ProcessedTasks []TaskDefinitionPruneEntry
 }
 
+// AWSClients holds initialized AWS service clients
+type AWSClients struct {
+	ECS            *ecs.Client
+	CloudWatchLogs *cloudwatchlogs.Client
+}
+
 // =============================================================================
 // Core Service Methods
 // =============================================================================
 
-func initCfg() (aws.Config, error) {
+// NewAWSClients creates and initializes AWS service clients with shared configuration
+func NewAWSClients() (*AWSClients, error) {
 	configFunctions := []func(*config.LoadOptions) error{
 		config.WithRetryer(func() aws.Retryer {
 			return retry.AddWithMaxAttempts(retry.NewStandard(), defaultNumberOfRetries)
@@ -121,12 +128,14 @@ func initCfg() (aws.Config, error) {
 	}
 
 	cfg, err := config.LoadDefaultConfig(context.Background(), configFunctions...)
-
 	if err != nil {
-		return aws.Config{}, err
+		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
 	}
 
-	return cfg, nil
+	return &AWSClients{
+		ECS:            ecs.NewFromConfig(cfg),
+		CloudWatchLogs: cloudwatchlogs.NewFromConfig(cfg),
+	}, nil
 }
 
 // =============================================================================
@@ -184,21 +193,14 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 	return *output.TaskDefinition.TaskDefinitionArn, nil
 }
 
-func Deploy(ctx context.Context, cluster, service, dockerImageTag string) (*DeployResult, error) {
-	cfg, err := initCfg()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
-	}
-
-	svc := ecs.NewFromConfig(cfg)
-
+func Deploy(ctx context.Context, clients *AWSClients, cluster, service, dockerImageTag string) (*DeployResult, error) {
 	// Clones the latest version of the task definition and inserts the new Docker URI.
-	TaskDefinitionArn, err := cloneTaskDef(ctx, cluster, service, dockerImageTag, svc)
+	TaskDefinitionArn, err := cloneTaskDef(ctx, cluster, service, dockerImageTag, clients.ECS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to clone task definition: %w", err)
 	}
 
-	updateOutput, err := svc.UpdateService(ctx, &ecs.UpdateServiceInput{
+	updateOutput, err := clients.ECS.UpdateService(ctx, &ecs.UpdateServiceInput{
 		Cluster:        &cluster,
 		Service:        &service,
 		TaskDefinition: &TaskDefinitionArn,
@@ -337,21 +339,13 @@ func wait(ctx context.Context, cluster string, client *ecs.Client, task string) 
 	return *taskInfo.LastStatus == "STOPPED", nil
 }
 
-func Execute(ctx context.Context, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
-	cfg, err := initCfg()
-	if err != nil {
-		return nil, err
-	}
-
-	svc := ecs.NewFromConfig(cfg)
-	logClient := cloudwatchlogs.NewFromConfig(cfg)
-
-	sdef, err := describeService(ctx, cluster, service, svc)
+func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
+	sdef, err := describeService(ctx, cluster, service, clients.ECS)
 	if err != nil {
 		return nil, fmt.Errorf("error loading service %s in cluster %s: %w", service, cluster, err)
 	}
 
-	tdef, err := describeTask(ctx, svc, &sdef.TaskDef)
+	tdef, err := describeTask(ctx, clients.ECS, &sdef.TaskDef)
 	if err != nil {
 		return nil, fmt.Errorf("error loading task definition %s: %w", sdef.TaskDef, err)
 	}
@@ -360,7 +354,7 @@ func Execute(ctx context.Context, cluster, service string, cmd []string, waitFor
 	newTaskDefCreated := false
 
 	if dockerImageTag != "" {
-		taskDef, err = cloneTaskDef(ctx, cluster, service, dockerImageTag, svc)
+		taskDef, err = cloneTaskDef(ctx, cluster, service, dockerImageTag, clients.ECS)
 		if err != nil {
 			return nil, err
 		}
@@ -369,7 +363,7 @@ func Execute(ctx context.Context, cluster, service string, cmd []string, waitFor
 		taskDef = sdef.TaskDef
 	}
 
-	output, err := svc.RunTask(ctx, &ecs.RunTaskInput{
+	output, err := clients.ECS.RunTask(ctx, &ecs.RunTaskInput{
 		Cluster:        &cluster,
 		TaskDefinition: &taskDef,
 		LaunchType:     "FARGATE",
@@ -421,13 +415,13 @@ func Execute(ctx context.Context, cluster, service string, cmd []string, waitFor
 			default:
 			}
 
-			logs, newTimestamp, err := getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp, logClient)
+			logs, newTimestamp, err := getProcessLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, *executedTask.TaskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
 			if err == nil {
 				result.Logs = append(result.Logs, logs...)
 				lastTimestamp = &newTimestamp
 			}
 
-			success, err := wait(ctx, cluster, svc, *executedTask.TaskArn)
+			success, err := wait(ctx, cluster, clients.ECS, *executedTask.TaskArn)
 			if err != nil {
 				return result, err
 			}
@@ -638,20 +632,13 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 	return totalCount, deleted, skipped, processedTasks, nil
 }
 
-func Prune(ctx context.Context, cluster, service string, keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
-	cfg, err := initCfg()
+func Prune(ctx context.Context, clients *AWSClients, cluster, service string, keepLast int, keepDays int, dryRun bool) (*PruneResult, error) {
+	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, clients.ECS)
 	if err != nil {
 		return nil, err
 	}
 
-	svc := ecs.NewFromConfig(cfg)
-
-	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, svc)
-	if err != nil {
-		return nil, err
-	}
-
-	families, err := getFamilies(ctx, familyPrefix, svc)
+	families, err := getFamilies(ctx, familyPrefix, clients.ECS)
 	if err != nil {
 		return nil, err
 	}
@@ -667,7 +654,7 @@ func Prune(ctx context.Context, cluster, service string, keepLast int, keepDays 
 	}
 
 	for _, family := range families {
-		totalCount, deletedCount, skippedCount, processedTasks, err := deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, svc)
+		totalCount, deletedCount, skippedCount, processedTasks, err := deregisterTaskFamily(ctx, family, keepLast, keepDays, dryRun, clients.ECS)
 		if err != nil {
 			return nil, err
 		}
@@ -757,26 +744,19 @@ func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Cl
 	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
 }
 
-func Restart(ctx context.Context, cluster, service string, kill bool) (*RestartResult, error) {
-	cfg, err := initCfg()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize AWS configuration: %w", err)
-	}
-
-	svc := ecs.NewFromConfig(cfg)
-
+func Restart(ctx context.Context, clients *AWSClients, cluster, service string, kill bool) (*RestartResult, error) {
 	result := &RestartResult{}
 
 	if kill {
 		result.Method = "kill"
-		stoppedTasks, err := stopAll(ctx, cluster, service, svc)
+		stoppedTasks, err := stopAll(ctx, cluster, service, clients.ECS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to stop tasks: %w", err)
 		}
 		result.StoppedTasks = stoppedTasks
 	} else {
 		result.Method = "force_deploy"
-		serviceArn, taskDefinition, err := forceNewDeploy(ctx, cluster, service, svc)
+		serviceArn, taskDefinition, err := forceNewDeploy(ctx, cluster, service, clients.ECS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to force new deployment: %w", err)
 		}
@@ -917,27 +897,20 @@ func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int,
 	return revisions, nil
 }
 
-func Revisions(ctx context.Context, cluster, service string, lastRevisionNr int) (*RevisionsResult, error) {
-	cfg, err := initCfg()
+func Revisions(ctx context.Context, clients *AWSClients, cluster, service string, lastRevisionNr int) (*RevisionsResult, error) {
+	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, clients.ECS)
 	if err != nil {
 		return nil, err
 	}
 
-	svc := ecs.NewFromConfig(cfg)
-
-	familyPrefix, err := getFamilyPrefix(ctx, cluster, service, svc)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := getFamilies(ctx, familyPrefix, svc)
+	response, err := getFamilies(ctx, familyPrefix, clients.ECS)
 	if err != nil {
 		return nil, err
 	}
 
 	var allRevisions []RevisionEntry
 	for _, family := range response {
-		revisions, err := getRevisions(ctx, family, lastRevisionNr, svc)
+		revisions, err := getRevisions(ctx, family, lastRevisionNr, clients.ECS)
 		if err != nil {
 			return nil, err
 		}

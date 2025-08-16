@@ -43,8 +43,13 @@ func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 
+		clients, err := ecs.NewAWSClients()
+		if err != nil {
+			log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+		}
+
 		cluster, service := parseServiceFlag()
-		result, err := ecs.Deploy(ctx, cluster, service, *dockerImageTag)
+		result, err := ecs.Deploy(ctx, clients, cluster, service, *dockerImageTag)
 		if err != nil {
 			log.Fatalf("Deploy failed: %v\n", err)
 		}
