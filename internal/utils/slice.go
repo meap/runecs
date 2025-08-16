@@ -11,25 +11,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ecs
+package utils
 
 import "errors"
 
 // Generic helper functions for safe slice access
 // These functions provide bounds checking to prevent panics when accessing slice elements
 
-// safeGetFirstPtr returns a pointer to the first element of a slice.
+// SafeGetFirstPtr returns a pointer to the first element of a slice.
 // Returns an error if the slice is empty to prevent panic on index access.
-func safeGetFirstPtr[T any](slice []T, errorMsg string) (*T, error) {
+func SafeGetFirstPtr[T any](slice []T, errorMsg string) (*T, error) {
 	if len(slice) == 0 {
 		return nil, errors.New(errorMsg)
 	}
 	return &slice[0], nil
 }
 
-// safeGetFirst returns the first element of a slice by value.
+// SafeGetFirst returns the first element of a slice by value.
 // Returns the zero value of type T and an error if the slice is empty.
-func safeGetFirst[T any](slice []T, errorMsg string) (T, error) {
+func SafeGetFirst[T any](slice []T, errorMsg string) (T, error) {
 	var zero T
 	if len(slice) == 0 {
 		return zero, errors.New(errorMsg)

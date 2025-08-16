@@ -20,6 +20,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"runecs.io/v1/internal/utils"
 )
 
 func getFamilies(ctx context.Context, familyPrefix string, svc *ecs.Client) ([]string, error) {
@@ -43,7 +44,7 @@ func getFamilyPrefix(ctx context.Context, cluster, service string, svc *ecs.Clie
 		return "", err
 	}
 
-	serviceInfo, err := safeGetFirstPtr(serviceResponse.Services, "no services found in response")
+	serviceInfo, err := utils.SafeGetFirstPtr(serviceResponse.Services, "no services found in response")
 	if err != nil {
 		return "", fmt.Errorf("failed to get service information: %w", err)
 	}
@@ -78,7 +79,7 @@ func latestTaskDefinitionArn(ctx context.Context, cluster, service string, svc *
 		return "", err
 	}
 
-	arn, err := safeGetFirst(response.TaskDefinitionArns, "no task definition ARNs found in response")
+	arn, err := utils.SafeGetFirst(response.TaskDefinitionArns, "no task definition ARNs found in response")
 	if err != nil {
 		return "", fmt.Errorf("failed to get task definition ARN: %w", err)
 	}
@@ -120,7 +121,7 @@ func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int,
 				continue // Skip revisions without registration date
 			}
 
-			containerDef, err := safeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+			containerDef, err := utils.SafeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
 			if err != nil {
 				continue // Skip revisions without container definitions
 			}

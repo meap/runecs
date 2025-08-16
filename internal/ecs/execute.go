@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"runecs.io/v1/internal/utils"
 )
 
 func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
@@ -29,7 +30,7 @@ func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (Tas
 		return TaskDefinition{}, err
 	}
 
-	containerDef, err := safeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	containerDef, err := utils.SafeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
 	if err != nil {
 		return TaskDefinition{}, fmt.Errorf("failed to get container definition from task %s: %w", *taskArn, err)
 	}
@@ -80,7 +81,7 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 		return false, err
 	}
 
-	taskInfo, err := safeGetFirstPtr(output.Tasks, "no tasks found in response")
+	taskInfo, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")
 	if err != nil {
 		return false, fmt.Errorf("failed to get task information: %w", err)
 	}
@@ -90,7 +91,7 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 	}
 
 	if *taskInfo.LastStatus == "STOPPED" {
-		container, err := safeGetFirstPtr(taskInfo.Containers, "no containers found in task")
+		container, err := utils.SafeGetFirstPtr(taskInfo.Containers, "no containers found in task")
 		if err != nil {
 			return false, fmt.Errorf("failed to get container information: %w", err)
 		}
@@ -161,7 +162,7 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 		return nil, fmt.Errorf("error describing service %s in cluster %s: %w", service, cluster, err)
 	}
 
-	serviceInfo, err := safeGetFirstPtr(resp.Services, "no services found in response")
+	serviceInfo, err := utils.SafeGetFirstPtr(resp.Services, "no services found in response")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service information: %w", err)
 	}
@@ -240,7 +241,7 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 		return nil, err
 	}
 
-	executedTask, err := safeGetFirstPtr(output.Tasks, "no tasks found in response")
+	executedTask, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get executed task: %w", err)
 	}

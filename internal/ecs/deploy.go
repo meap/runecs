@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/jinzhu/copier"
+	"runecs.io/v1/internal/utils"
 )
 
 func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, svc *ecs.Client) (string, error) {
@@ -43,7 +44,7 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 		return "", errors.New("multiple container definitions in a single task are not supported")
 	}
 
-	containerDef, err := safeGetFirstPtr(response.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	containerDef, err := utils.SafeGetFirstPtr(response.TaskDefinition.ContainerDefinitions, "no container definitions found")
 	if err != nil {
 		return "", fmt.Errorf("failed to get container definition: %w", err)
 	}

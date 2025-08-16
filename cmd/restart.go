@@ -10,7 +10,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
-	"runecs.io/v1/pkg/ecs"
+	"runecs.io/v1/internal/ecs"
 )
 
 func newRestartCommand() *cobra.Command {
