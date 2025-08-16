@@ -1,0 +1,101 @@
+// Copyright (c) Petr Reichl and affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package cmd
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+
+	"github.com/spf13/cobra"
+	"runecs.io/v1/internal/ecs"
+)
+
+func newScaleCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:                   "scale <value>",
+		Short:                 "Scale the number of running tasks for a service",
+		Args:                  cobra.ExactArgs(1),
+		DisableFlagsInUseLine: true,
+		PreRunE:               scalePreRunE,
+		RunE:                  scaleHandler,
+	}
+
+	return cmd
+}
+
+func scalePreRunE(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return errors.New("scale command requires exactly one argument: the desired task count")
+	}
+
+	value, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid scale value: %w", err)
+	}
+
+	const minTaskCount = 0
+	const maxTaskCount = 1000
+
+	if value < minTaskCount || value > maxTaskCount {
+		return fmt.Errorf("scale value must be between %d and %d", minTaskCount, maxTaskCount)
+	}
+
+	return nil
+}
+
+func scaleHandler(cmd *cobra.Command, args []string) error {
+	value, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid scale value: %w", err)
+	}
+
+	cluster, service, err := parseServiceFlag()
+	if err != nil {
+		return err
+	}
+
+	// Set up context that cancels on interrupt signal for proper Ctrl+C handling
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	profile := rootCmd.Flag("profile").Value.String()
+	clients, err := ecs.NewAWSClients(ctx, profile)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS clients: %w", err)
+	}
+
+	// Log the scaling operation
+	slog.Info("scaling service",
+		"cluster", cluster,
+		"service", service,
+		"desiredCount", value,
+		"profile", profile,
+	)
+
+	// For now, just print Hello World with the parameters
+	fmt.Printf("Hello World! Scaling service '%s/%s' to %d tasks\n", cluster, service, value)
+	fmt.Printf("AWS Clients initialized: %v\n", clients != nil)
+
+	return nil
+}
+
+func init() {
+	rootCmd.AddCommand(newScaleCommand())
+}
