@@ -33,7 +33,7 @@ Pre-compiled binaries for all platforms are available on our [releases page](htt
 
 ### AWS Credentials
 
-AWS credential configuration through environment variables is supported as documented in the [AWS CLI Environment Variables guide](https://docs.aws.amazon.com/cli/v1/userguide/cli-configure-envvars.html). This approach integrates seamlessly with tools like [direnv](https://direnv.net/), enabling distinct AWS account configurations, regions, and other settings to be maintained on a per-directory or per-project basis. Multiple AWS environments can be managed effectively without the need for constant profile switching.
+RunECS supports multiple methods for AWS authentication. See [AWS Authentication](docs/aws-authentication.md) for detailed configuration options.
 
 ## Key Features
 

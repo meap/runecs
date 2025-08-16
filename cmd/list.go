@@ -33,7 +33,8 @@ func listHandler(cmd *cobra.Command, args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	clients, err := ecs.NewAWSClients()
+	profile := rootCmd.Flag("profile").Value.String()
+	clients, err := ecs.NewAWSClients(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
