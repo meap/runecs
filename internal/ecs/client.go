@@ -47,5 +47,6 @@ func NewAWSClients(ctx context.Context, profile string) (*AWSClients, error) {
 	return &AWSClients{
 		ECS:            ecs.NewFromConfig(cfg),
 		CloudWatchLogs: cloudwatchlogs.NewFromConfig(cfg),
+		Region:         cfg.Region,
 	}, nil
 }
