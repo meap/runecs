@@ -30,20 +30,14 @@ type AWSClients struct {
 	CloudWatchLogs *cloudwatchlogs.Client
 }
 
-// ServiceDefinition represents local service configuration used by ECS functions
-type ServiceDefinition struct {
-	Subnets        []string
-	SecurityGroups []string
-	TaskDef        string
-}
-
 // TaskDefinition represents task definition metadata
 type TaskDefinition struct {
-	Name            string
-	LogGroup        string
-	LogStreamPrefix string
-	Cpu             string
-	Memory          string
+	Name                    string
+	LogGroup                string
+	LogStreamPrefix         string
+	Cpu                     string
+	Memory                  string
+	RequiresCompatibilities []string
 }
 
 // LogEntry represents a single log entry from CloudWatch
