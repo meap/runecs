@@ -131,3 +131,12 @@ type ClusterInfo struct {
 	Name     string
 	Services []ServiceInfo
 }
+
+// ScaleResult contains the result of a service scaling operation
+type ScaleResult struct {
+	ServiceArn           string
+	PreviousDesiredCount int32
+	NewDesiredCount      int32
+	ClusterName          string
+	ServiceName          string
+}

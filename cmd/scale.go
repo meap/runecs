@@ -17,12 +17,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"runecs.io/v1/internal/ecs"
 )
@@ -50,7 +50,7 @@ func scalePreRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid scale value: %w", err)
 	}
 
-	const minTaskCount = 0
+	const minTaskCount = 1
 	const maxTaskCount = 1000
 
 	if value < minTaskCount || value > maxTaskCount {
@@ -81,17 +81,17 @@ func scaleHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	// Log the scaling operation
-	slog.Info("scaling service",
-		"cluster", cluster,
-		"service", service,
-		"desiredCount", value,
-		"profile", profile,
-	)
+	result, err := ecs.Scale(ctx, clients, cluster, service, int32(value))
+	if err != nil {
+		return fmt.Errorf("failed to scale service: %w", err)
+	}
 
-	// For now, just print Hello World with the parameters
-	fmt.Printf("Hello World! Scaling service '%s/%s' to %d tasks\n", cluster, service, value)
-	fmt.Printf("AWS Clients initialized: %v\n", clients != nil)
+	// Create lipgloss style for service name formatting
+	boldStyle := lipgloss.NewStyle().Bold(true)
+
+	fmt.Printf("Service %s scaled from %d to %d tasks\n",
+		boldStyle.Render(fmt.Sprintf("%s/%s", result.ClusterName, result.ServiceName)),
+		result.PreviousDesiredCount, result.NewDesiredCount)
 
 	return nil
 }
