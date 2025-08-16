@@ -39,7 +39,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 	defer cancel()
 
 	profile := rootCmd.Flag("profile").Value.String()
-	clients, err := ecs.NewAWSClients(profile)
+	clients, err := ecs.NewAWSClients(ctx, profile)
 	if err != nil {
 		log.Fatalf("Failed to initialize AWS clients: %v\n", err)
 	}
