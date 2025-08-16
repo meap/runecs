@@ -33,15 +33,15 @@ Pre-compiled binaries for all platforms are available on our [releases page](htt
 
 ### AWS Credentials
 
-RunECS supports AWS credential configuration through environment variables as documented in the [AWS CLI Environment Variables guide](https://docs.aws.amazon.com/cli/v1/userguide/cli-configure-envvars.html). This approach integrates seamlessly with tools like [direnv](https://direnv.net/), enabling you to maintain distinct AWS account configurations, regions, and other settings on a per-directory or per-project basis. This makes it particularly useful for managing multiple AWS environments without the hassle of constantly switching profiles.
+AWS credential configuration through environment variables is supported as documented in the [AWS CLI Environment Variables guide](https://docs.aws.amazon.com/cli/v1/userguide/cli-configure-envvars.html). This approach integrates seamlessly with tools like [direnv](https://direnv.net/), enabling distinct AWS account configurations, regions, and other settings to be maintained on a per-directory or per-project basis. Multiple AWS environments can be managed effectively without the need for constant profile switching.
 
 ## Key Features
 
-For a complete list of available commands, run `runecs --help`. Below are some common use cases to help you get started.
+A complete list of available commands can be obtained by running `runecs --help`. Common use cases are demonstrated below.
 
 ### Deploy a Specific Docker Image Tag
 
-Deploy a specific Docker image tag or commit SHA to your ECS service. This is particularly useful for rolling back to a known-good version or deploying a specific build:
+A specific Docker image tag or commit SHA can be deployed to an ECS service. This functionality is particularly useful when rollbacks to known-good versions are required or when specific builds need to be deployed:
 
 ```bash
 runecs deploy --service mycanvas-ecs-staging-cluster/web -i 9cd43549f03faf9bbc0ddc3eba8585f00098b240
@@ -49,23 +49,23 @@ runecs deploy --service mycanvas-ecs-staging-cluster/web -i 9cd43549f03faf9bbc0d
 
 ### Run One-Off Commands in ECS
 
-Execute one-off commands directly in your ECS environment, perfect for database migrations, maintenance tasks, or debugging within your configured VPC and security groups. This ensures your commands run with the same network access, environment variables, and IAM permissions as your services:
+One-off commands can be executed directly in the ECS environment, making it ideal for database migrations, maintenance tasks, or debugging within configured VPC and security groups. Commands are executed with the same network access, environment variables, and IAM permissions as the services:
 
 ```bash
 runecs run "echo \"HELLO WORLD\"" -w --service mycanvas-ecs-staging-cluster/web
 ```
 
-RunECS supports both AWS Fargate and EC2 capacity providers, automatically selecting the appropriate launch type based on your service configuration. The `-w` flag waits for task completion and streams the full output to your terminal, making it ideal for interactive debugging and migration scripts.
+Both AWS Fargate and EC2 capacity providers are supported, with the appropriate launch type being automatically selected based on service configuration. When the `-w` flag is used, task completion is awaited and full output is streamed to the terminal, making it ideal for interactive debugging and migration scripts.
 
 ### Restart ECS Services
 
-Gracefully restart your ECS services without downtime, or force immediate task termination when needed:
+ECS services can be gracefully restarted without downtime, or immediate task termination can be forced when required:
 
 ```bash
 runecs restart --service mycanvas-ecs-staging-cluster/addrp
 ```
 
-By default, RunECS performs a rolling restart, replacing tasks one by one to maintain service availability. For situations requiring immediate task termination (such as clearing stuck processes or forcing configuration reloads), use the `--kill` flag to terminate all tasks at once, allowing ECS to spawn replacements according to your service's desired count.
+By default, a rolling restart is performed, with tasks being replaced one by one to maintain service availability. For situations where immediate task termination is required (such as clearing stuck processes or forcing configuration reloads), the `--kill` flag can be used to terminate all tasks at once, allowing replacements to be spawned according to the service's desired count.
 
 ## FAQ
 
