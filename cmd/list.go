@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss/list"
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
-	"runecs.io/v1/pkg/ecs"
+	"runecs.io/v1/internal/ecs"
 )
 
 func newListCommand() *cobra.Command {
@@ -45,19 +45,19 @@ func listHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	if all {
-		displayServicesWithDetails(clusters)
+		displayServicesWithDetails(clusters, clients.Region)
 	} else {
-		displayServices(clusters)
+		displayServices(clusters, clients.Region)
 	}
 
 	return nil
 }
 
-func displayServices(clusters []ecs.ClusterInfo) {
+func displayServices(clusters []ecs.ClusterInfo, region string) {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 	enumStyle := lipgloss.NewStyle().MarginLeft(2).MarginRight(1)
 
-	fmt.Println("Services in all clusters:")
+	fmt.Printf("Services in all clusters (region: %s):\n", boldStyle.Render(region))
 	fmt.Println()
 
 	for _, cluster := range clusters {
@@ -76,7 +76,8 @@ func displayServices(clusters []ecs.ClusterInfo) {
 	}
 }
 
-func displayServicesWithDetails(clusters []ecs.ClusterInfo) {
+func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
+	boldStyle := lipgloss.NewStyle().Bold(true)
 	headerStyle := lipgloss.NewStyle().Bold(true).Align(lipgloss.Center)
 	cellStyle := lipgloss.NewStyle().Padding(0, 1)
 
@@ -118,7 +119,7 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo) {
 		Headers("Service", "Task ID", "CPU", "Memory", "Running Time").
 		Rows(rows...)
 
-	fmt.Println("Services with running tasks:")
+	fmt.Printf("Services with running tasks (region: %s):\n", boldStyle.Render(region))
 	fmt.Println()
 	fmt.Println(t)
 }

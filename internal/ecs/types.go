@@ -28,6 +28,7 @@ const (
 type AWSClients struct {
 	ECS            *ecs.Client
 	CloudWatchLogs *cloudwatchlogs.Client
+	Region         string
 }
 
 // TaskDefinition represents task definition metadata
