@@ -10,27 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 )
 
-// TaskInfo represents an ECS task with its details for listing
-type TaskInfo struct {
-	ID          string
-	CPU         string
-	Memory      string
-	RunningTime string
-}
-
-// ServiceInfo represents an ECS service with its details for listing
-type ServiceInfo struct {
-	Name        string
-	ClusterName string
-	Tasks       []TaskInfo
-}
-
-// ClusterInfo represents an ECS cluster with its services for listing
-type ClusterInfo struct {
-	Name     string
-	Services []ServiceInfo
-}
-
 func getClusterArns(ctx context.Context, svc *ecs.Client) ([]string, error) {
 	var clusterArns []string
 	input := &ecs.ListClustersInput{}
