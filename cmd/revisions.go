@@ -6,7 +6,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"sort"
@@ -24,14 +23,14 @@ func newRevisionsCommand() *cobra.Command {
 		Use:                   "revisions",
 		Short:                 "List active task definitions",
 		DisableFlagsInUseLine: true,
-		Run:                   revisionsHandler,
+		RunE:                  revisionsHandler,
 	}
 
 	cmd.PersistentFlags().IntP("last", "", 0, "last N revisions")
 	return cmd
 }
 
-func revisionsHandler(cmd *cobra.Command, args []string) {
+func revisionsHandler(cmd *cobra.Command, args []string) error {
 	revNr, _ := cmd.Flags().GetInt("last")
 
 	// Set up context that cancels on interrupt signal for cancellable revisions operations
@@ -41,13 +40,16 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 	profile := rootCmd.Flag("profile").Value.String()
 	clients, err := ecs.NewAWSClients(ctx, profile)
 	if err != nil {
-		log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	cluster, service := parseServiceFlag()
+	cluster, service, err := parseServiceFlag()
+	if err != nil {
+		return err
+	}
 	result, err := ecs.Revisions(ctx, clients, cluster, service, revNr)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
 	// Sort revisions by revision number in descending order
@@ -75,6 +77,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) {
 			fmt.Printf("%s: %s\n", formattedDate, revision.DockerURI)
 		}
 	}
+	return nil
 }
 
 func init() {

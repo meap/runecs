@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -14,11 +14,11 @@ func newCompletionCommand() *cobra.Command {
 		DisableFlagsInUseLine: true,
 		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-		Run:                   completionHandler,
+		RunE:                  completionHandler,
 	}
 }
 
-func completionHandler(cmd *cobra.Command, args []string) {
+func completionHandler(cmd *cobra.Command, args []string) error {
 	var err error
 
 	switch args[0] {
@@ -33,8 +33,9 @@ func completionHandler(cmd *cobra.Command, args []string) {
 	}
 
 	if err != nil {
-		log.Fatalf("failed to generate completion script: %v\n", err)
+		return fmt.Errorf("failed to generate completion script: %w", err)
 	}
+	return nil
 }
 
 func init() {

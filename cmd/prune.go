@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,7 +17,7 @@ func newPruneCommand() *cobra.Command {
 		Use:                   "prune",
 		Short:                 "Deregister active task definitions",
 		DisableFlagsInUseLine: true,
-		Run:                   pruneHandler,
+		RunE:                  pruneHandler,
 	}
 
 	cmd.PersistentFlags().BoolP("dry-run", "", false, "dry run")
@@ -27,7 +26,7 @@ func newPruneCommand() *cobra.Command {
 	return cmd
 }
 
-func pruneHandler(cmd *cobra.Command, args []string) {
+func pruneHandler(cmd *cobra.Command, args []string) error {
 	keepLastNr, _ := cmd.Flags().GetInt("keep-last")
 	keepDays, _ := cmd.Flags().GetInt("keep-days")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -39,13 +38,16 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 	profile := rootCmd.Flag("profile").Value.String()
 	clients, err := ecs.NewAWSClients(ctx, profile)
 	if err != nil {
-		log.Fatalf("Failed to initialize AWS clients: %v\n", err)
+		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	cluster, service := parseServiceFlag()
+	cluster, service, err := parseServiceFlag()
+	if err != nil {
+		return err
+	}
 	result, err := ecs.Prune(ctx, clients, cluster, service, keepLastNr, keepDays, dryRun)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
 	// Display families being processed
@@ -84,6 +86,7 @@ func pruneHandler(cmd *cobra.Command, args []string) {
 		fmt.Printf("Total of %d task definitions. Deleted %d definitions.\n",
 			result.TotalCount, result.DeletedCount)
 	}
+	return nil
 }
 
 func init() {
