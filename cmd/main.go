@@ -16,7 +16,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"slices"
 	"strings"
@@ -53,7 +52,7 @@ func init() {
 	rootCmd.PersistentFlags().String("profile", "", "AWS profile to use for credentials")
 }
 
-func parseServiceFlag() (cluster, service string) {
+func parseServiceFlag() (cluster, service string, err error) {
 	serviceValue := rootCmd.Flag("service").Value.String()
 
 	parsed := strings.Split(serviceValue, "/")
@@ -61,19 +60,18 @@ func parseServiceFlag() (cluster, service string) {
 		cluster = parsed[0]
 		service = parsed[1]
 	} else if serviceValue != "" {
-		log.Fatalf("Invalid service name %s\n", serviceValue)
+		return "", "", fmt.Errorf("invalid service name %s", serviceValue)
 	}
 
 	if cluster == "" || service == "" {
-		log.Fatalf("Missing cluster or service configuration\n")
+		return "", "", fmt.Errorf("missing cluster or service configuration")
 	}
 
-	return cluster, service
+	return cluster, service, nil
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }

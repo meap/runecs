@@ -118,7 +118,7 @@ func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, servic
 func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([]ClusterInfo, error) {
 	clusterArns, err := getClusterArns(ctx, clients.ECS)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list clusters: %w", err)
+		return nil, err
 	}
 
 	clusters := []ClusterInfo{}
