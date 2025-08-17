@@ -76,4 +76,7 @@ runecs list --profile production
 
 # Deploy using a different profile
 runecs deploy --service myapp/web -i latest --profile staging
+
+# If profile doesn't have region defined, specify it with AWS_REGION
+AWS_REGION=eu-central-1 runecs list --profile staging
 ```
