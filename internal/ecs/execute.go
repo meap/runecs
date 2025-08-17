@@ -113,8 +113,14 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		return fmt.Errorf("failed to get caller identity: %w", err)
 	}
 
-	// Construct the LogGroup ARN
-	logGroupArn := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", clients.Region, *identity.Account, tdef.LogGroup)
+	// Extract partition from caller's ARN to handle different AWS partitions
+	partition, err := extractPartitionFromARN(*identity.Arn)
+	if err != nil {
+		return fmt.Errorf("failed to extract partition from caller ARN: %w", err)
+	}
+
+	// Construct the LogGroup ARN with correct partition
+	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, fmt.Sprintf("log-group:%s", tdef.LogGroup))
 
 	// Extract task ID from task ARN for log stream pattern
 	taskID, err := extractARNResource(taskArn)
