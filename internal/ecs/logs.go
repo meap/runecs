@@ -16,6 +16,7 @@ package ecs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
@@ -24,6 +25,15 @@ import (
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"runecs.io/v1/internal/utils"
+)
+
+const (
+	// ErrStreamUnexpectedEvent indicates an unexpected event type was received from CloudWatch Logs stream
+	ErrStreamUnexpectedEvent = "unexpected event type received from log stream"
+	// ErrStreamNilEvent indicates a nil event was received from CloudWatch Logs stream
+	ErrStreamNilEvent = "nil event received from log stream"
+	// ErrStreamError indicates an error occurred in the CloudWatch Logs stream
+	ErrStreamError = "log stream error occurred"
 )
 
 func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionArn string) (logGroup, logStreamPrefix, containerName string, err error) {
@@ -168,11 +178,19 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 					}
 				default:
 					if err := stream.Err(); err != nil {
+						slog.Error(ErrStreamError,
+							"error", err,
+							"context", "CloudWatch logs live tail stream")
 						return
 					}
 					if event == nil {
+						slog.Debug(ErrStreamNilEvent,
+							"context", "CloudWatch logs live tail stream")
 						return
 					}
+					slog.Warn(ErrStreamUnexpectedEvent,
+						"event_type", fmt.Sprintf("%T", event),
+						"context", "CloudWatch logs live tail stream")
 				}
 			}
 		}
