@@ -56,15 +56,15 @@ func logsHandler(cmd *cobra.Command, args []string) error {
 }
 
 func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service string) error {
-	fmt.Printf("Fetching logs from the last 5 minutes for service %s...\n", boldStyle.Render(cluster+"/"+service))
-	fiveMinutesAgo := time.Now().Add(-5*time.Minute).Unix() * 1000
-	logs, err := ecs.GetServiceLogs(ctx, clients, cluster, service, &fiveMinutesAgo)
+	fmt.Printf("Fetching logs from the last hour for service %s...\n", boldStyle.Render(cluster+"/"+service))
+	oneHourAgo := time.Now().Add(-time.Hour).Unix() * 1000
+	logs, err := ecs.GetServiceLogs(ctx, clients, cluster, service, &oneHourAgo)
 	if err != nil {
 		return fmt.Errorf("failed to get logs for service %s/%s: %w", cluster, service, err)
 	}
 
 	if len(logs) == 0 {
-		fmt.Println("No logs found in the last 5 minutes")
+		fmt.Println("No logs found in the last hour")
 		return nil
 	}
 
