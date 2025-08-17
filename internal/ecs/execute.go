@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"runecs.io/v1/internal/utils"
 )
 
@@ -106,20 +107,62 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 
 // waitForTaskCompletion waits for an ECS task to complete and collects its logs
 func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster string, taskArn string, tdef TaskDefinition, result *ExecuteResult) error {
-	var lastTimestamp *int64 = nil
+	// Get the account ID using STS
+	identity, err := clients.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %w", err)
+	}
 
+	// Construct the LogGroup ARN
+	logGroupArn := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", clients.Region, *identity.Account, tdef.LogGroup)
+
+	// Extract task ID from task ARN for log stream pattern
+	taskID, err := extractARNResource(taskArn)
+	if err != nil {
+		return fmt.Errorf("failed to extract task ID from ARN: %w", err)
+	}
+
+	// Build log stream prefix pattern
+	logStreamPrefixPattern := fmt.Sprintf("%s/%s/%s", tdef.LogStreamPrefix, tdef.Name, taskID)
+
+	// Start tailing logs
+	logChan, closeFunc, err := TailLogGroups(ctx, clients.CloudWatchLogs, []string{logGroupArn}, []string{logStreamPrefixPattern})
+	if err != nil {
+		return fmt.Errorf("failed to start log tailing: %w", err)
+	}
+	defer closeFunc()
+
+	// Inform user about cancellation option
+	fmt.Println("Waiting for task to complete and streaming logs... Press CTRL+C to stop waiting (task will continue running).")
+
+	// Create a context that can be cancelled when task completes
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Start goroutine to collect logs
+	logsDone := make(chan struct{})
+	go func() {
+		defer close(logsDone)
+		for {
+			select {
+			case <-taskCtx.Done():
+				return
+			case logEntry, ok := <-logChan:
+				if !ok {
+					return
+				}
+				result.Logs = append(result.Logs, logEntry)
+			}
+		}
+	}()
+
+	// Poll task status
 	for {
 		// Check for context cancellation before each iteration
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-		}
-
-		logs, newTimestamp, err := getTaskLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, taskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
-		if err == nil {
-			result.Logs = append(result.Logs, logs...)
-			lastTimestamp = &newTimestamp
 		}
 
 		success, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
@@ -129,6 +172,9 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 
 		if success {
 			result.Finished = true
+			// Cancel the log collection context and wait for it to finish
+			cancel()
+			<-logsDone
 			break
 		}
 
