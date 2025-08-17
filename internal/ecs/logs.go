@@ -19,16 +19,42 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"runecs.io/v1/internal/utils"
 )
 
-func getTaskLogs(
-	ctx context.Context, logGroupname string,
-	logStreamPrefix string,
-	taskArn string,
-	name string,
-	startTime *int64,
-	client *cloudwatchlogs.Client) ([]LogEntry, int64, error) {
+func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionArn string) (logGroup, logStreamPrefix, containerName string, err error) {
+	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
+		TaskDefinition: &taskDefinitionArn,
+	})
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to describe task definition %s: %w", taskDefinitionArn, err)
+	}
 
+	containerDef, err := utils.SafeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to get container definition from task %s: %w", taskDefinitionArn, err)
+	}
+
+	if containerDef.Name == nil {
+		return "", "", "", fmt.Errorf("container definition has no name in task %s", taskDefinitionArn)
+	}
+
+	containerName = *containerDef.Name
+
+	logConfig := containerDef.LogConfiguration
+	if logConfig != nil && logConfig.LogDriver == ecsTypes.LogDriverAwslogs {
+		logGroup = logConfig.Options["awslogs-group"]
+		logStreamPrefix = logConfig.Options["awslogs-stream-prefix"]
+	}
+
+	return logGroup, logStreamPrefix, containerName, nil
+}
+
+func getTaskLogs(ctx context.Context, logGroupname string, logStreamPrefix string, taskArn string, name string, startTime *int64, client *cloudwatchlogs.Client) ([]LogEntry, int64, error) {
 	processID, err := extractARNResource(taskArn)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to extract process ID from task ARN: %w", err)
@@ -80,4 +106,137 @@ func getTaskLogs(
 	}
 
 	return logs, lastEventTimestamp, nil
+}
+
+func GetServiceLogs(ctx context.Context, clients *AWSClients, cluster, service string, startTime *int64) ([]LogEntry, error) {
+	latestTaskDefArn, err := latestTaskDefinitionArn(ctx, cluster, service, clients.ECS)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest task definition for service %s: %w", service, err)
+	}
+
+	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, clients.ECS, latestTaskDefArn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get log configuration: %w", err)
+	}
+
+	if logGroup == "" || logStreamPrefix == "" {
+		return nil, fmt.Errorf("service %s does not have CloudWatch logging configured", service)
+	}
+
+	input := &ecs.ListTasksInput{
+		Cluster:     aws.String(cluster),
+		ServiceName: aws.String(service),
+	}
+
+	listTasksOutput, err := clients.ECS.ListTasks(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tasks for service %s: %w", service, err)
+	}
+
+	if len(listTasksOutput.TaskArns) == 0 {
+		return nil, fmt.Errorf("no running tasks found for service %s", service)
+	}
+
+	var allLogs []LogEntry
+	for _, taskArn := range listTasksOutput.TaskArns {
+		logs, _, err := getTaskLogs(ctx, logGroup, logStreamPrefix, taskArn, containerName, startTime, clients.CloudWatchLogs)
+		if err != nil {
+			continue
+		}
+		allLogs = append(allLogs, logs...)
+	}
+
+	return allLogs, nil
+}
+
+func TailServiceLogs(ctx context.Context, clients *AWSClients, cluster, service string) (<-chan LogEntry, func(), error) {
+	latestTaskDefArn, err := latestTaskDefinitionArn(ctx, cluster, service, clients.ECS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get latest task definition for service %s: %w", service, err)
+	}
+
+	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, clients.ECS, latestTaskDefArn)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get log configuration: %w", err)
+	}
+
+	if logGroup == "" || logStreamPrefix == "" {
+		return nil, nil, fmt.Errorf("service %s does not have CloudWatch logging configured", service)
+	}
+
+	// Get the account ID using STS
+	identity, err := clients.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get caller identity: %w", err)
+	}
+
+	// Construct the LogGroup ARN
+	logGroupArn := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", clients.Region, *identity.Account, logGroup)
+
+	// Use LogStreamNamePrefixes to capture all streams for this service's containers
+	logStreamPrefixPattern := fmt.Sprintf("%s/%s/", logStreamPrefix, containerName)
+
+	startLiveTailInput := &cloudwatchlogs.StartLiveTailInput{
+		LogGroupIdentifiers:   []string{logGroupArn},
+		LogStreamNamePrefixes: []string{logStreamPrefixPattern},
+	}
+
+	response, err := clients.CloudWatchLogs.StartLiveTail(ctx, startLiveTailInput)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to start live tail: %w", err)
+	}
+
+	stream := response.GetStream()
+	logChan := make(chan LogEntry, 100)
+
+	go func() {
+		defer close(logChan)
+		defer stream.Close()
+
+		eventsChan := stream.Events()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-eventsChan:
+				if !ok {
+					return
+				}
+
+				switch e := event.(type) {
+				case *types.StartLiveTailResponseStreamMemberSessionStart:
+					continue
+				case *types.StartLiveTailResponseStreamMemberSessionUpdate:
+					for _, logEvent := range e.Value.SessionResults {
+						if logEvent.Message == nil || logEvent.Timestamp == nil || logEvent.LogStreamName == nil {
+							continue
+						}
+						logEntry := LogEntry{
+							StreamName: *logEvent.LogStreamName,
+							Message:    *logEvent.Message,
+							Timestamp:  *logEvent.Timestamp,
+						}
+						select {
+						case logChan <- logEntry:
+						case <-ctx.Done():
+							return
+						}
+					}
+				default:
+					if err := stream.Err(); err != nil {
+						return
+					}
+					if event == nil {
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	closeFunc := func() {
+		stream.Close()
+	}
+
+	return logChan, closeFunc, nil
 }

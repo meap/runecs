@@ -30,23 +30,15 @@ func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (Tas
 		return TaskDefinition{}, err
 	}
 
-	containerDef, err := utils.SafeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, client, *taskArn)
 	if err != nil {
-		return TaskDefinition{}, fmt.Errorf("failed to get container definition from task %s: %w", *taskArn, err)
-	}
-
-	if containerDef.Name == nil {
-		return TaskDefinition{}, fmt.Errorf("container definition has no name in task %s", *taskArn)
+		return TaskDefinition{}, err
 	}
 
 	output := TaskDefinition{}
-	output.Name = *containerDef.Name
-
-	logConfig := containerDef.LogConfiguration
-	if logConfig != nil && logConfig.LogDriver == types.LogDriverAwslogs {
-		output.LogGroup = logConfig.Options["awslogs-group"]
-		output.LogStreamPrefix = logConfig.Options["awslogs-stream-prefix"]
-	}
+	output.Name = containerName
+	output.LogGroup = logGroup
+	output.LogStreamPrefix = logStreamPrefix
 
 	if resp.TaskDefinition.Cpu == nil {
 		return TaskDefinition{}, fmt.Errorf("task definition has no CPU specification: %s", *taskArn)
