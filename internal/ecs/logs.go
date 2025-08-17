@@ -149,39 +149,13 @@ func GetServiceLogs(ctx context.Context, clients *AWSClients, cluster, service s
 	return allLogs, nil
 }
 
-func TailServiceLogs(ctx context.Context, clients *AWSClients, cluster, service string) (<-chan LogEntry, func(), error) {
-	latestTaskDefArn, err := latestTaskDefinitionArn(ctx, cluster, service, clients.ECS)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get latest task definition for service %s: %w", service, err)
-	}
-
-	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, clients.ECS, latestTaskDefArn)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get log configuration: %w", err)
-	}
-
-	if logGroup == "" || logStreamPrefix == "" {
-		return nil, nil, fmt.Errorf("service %s does not have CloudWatch logging configured", service)
-	}
-
-	// Get the account ID using STS
-	identity, err := clients.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get caller identity: %w", err)
-	}
-
-	// Construct the LogGroup ARN
-	logGroupArn := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", clients.Region, *identity.Account, logGroup)
-
-	// Use LogStreamNamePrefixes to capture all streams for this service's containers
-	logStreamPrefixPattern := fmt.Sprintf("%s/%s/", logStreamPrefix, containerName)
-
+func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGroupIdentifiers []string, logStreamPrefixes []string) (<-chan LogEntry, func(), error) {
 	startLiveTailInput := &cloudwatchlogs.StartLiveTailInput{
-		LogGroupIdentifiers:   []string{logGroupArn},
-		LogStreamNamePrefixes: []string{logStreamPrefixPattern},
+		LogGroupIdentifiers:   logGroupIdentifiers,
+		LogStreamNamePrefixes: logStreamPrefixes,
 	}
 
-	response, err := clients.CloudWatchLogs.StartLiveTail(ctx, startLiveTailInput)
+	response, err := cwClient.StartLiveTail(ctx, startLiveTailInput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to start live tail: %w", err)
 	}
@@ -239,4 +213,34 @@ func TailServiceLogs(ctx context.Context, clients *AWSClients, cluster, service 
 	}
 
 	return logChan, closeFunc, nil
+}
+
+func TailServiceLogs(ctx context.Context, clients *AWSClients, cluster, service string) (<-chan LogEntry, func(), error) {
+	latestTaskDefArn, err := latestTaskDefinitionArn(ctx, cluster, service, clients.ECS)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get latest task definition for service %s: %w", service, err)
+	}
+
+	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, clients.ECS, latestTaskDefArn)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get log configuration: %w", err)
+	}
+
+	if logGroup == "" || logStreamPrefix == "" {
+		return nil, nil, fmt.Errorf("service %s does not have CloudWatch logging configured", service)
+	}
+
+	// Get the account ID using STS
+	identity, err := clients.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get caller identity: %w", err)
+	}
+
+	// Construct the LogGroup ARN
+	logGroupArn := fmt.Sprintf("arn:aws:logs:%s:%s:log-group:%s", clients.Region, *identity.Account, logGroup)
+
+	// Use LogStreamNamePrefixes to capture all streams for this service's containers
+	logStreamPrefixPattern := fmt.Sprintf("%s/%s/", logStreamPrefix, containerName)
+
+	return TailLogGroups(ctx, clients.CloudWatchLogs, []string{logGroupArn}, []string{logStreamPrefixPattern})
 }

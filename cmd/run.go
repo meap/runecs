@@ -77,7 +77,7 @@ func runHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display service loading information
-	fmt.Printf("Service '%s' loaded.\n", result.ServiceName)
+	fmt.Printf("Service '%s' loaded.\n", service)
 
 	// Display task definition information
 	if result.NewTaskDefCreated {

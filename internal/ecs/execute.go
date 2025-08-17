@@ -243,7 +243,6 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	result := &ExecuteResult{
-		ServiceName:       service,
 		TaskDefinition:    taskDef,
 		TaskArn:           *executedTask.TaskArn,
 		NewTaskDefCreated: newTaskDefCreated,
