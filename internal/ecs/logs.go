@@ -54,60 +54,6 @@ func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionA
 	return logGroup, logStreamPrefix, containerName, nil
 }
 
-func getTaskLogs(ctx context.Context, logGroupname string, logStreamPrefix string, taskArn string, name string, startTime *int64, client *cloudwatchlogs.Client) ([]LogEntry, int64, error) {
-	processID, err := extractARNResource(taskArn)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to extract process ID from task ARN: %w", err)
-	}
-
-	input := &cloudwatchlogs.FilterLogEventsInput{
-		LogGroupName:   aws.String(logGroupname),
-		LogStreamNames: []string{fmt.Sprintf("%s/%s/%s", logStreamPrefix, name, processID)},
-	}
-
-	if startTime != nil {
-		input.StartTime = startTime
-	}
-
-	output, err := client.FilterLogEvents(ctx, input)
-
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to filter log events (%w)", err)
-	}
-
-	var logs []LogEntry
-	for _, event := range output.Events {
-		if event.LogStreamName == nil || event.Message == nil || event.Timestamp == nil {
-			continue // Skip events with missing required fields
-		}
-		logs = append(logs, LogEntry{
-			StreamName: *event.LogStreamName,
-			Message:    *event.Message,
-			Timestamp:  *event.Timestamp,
-		})
-	}
-
-	var lastEventTimestamp int64
-	if len(output.Events) > 0 {
-		lastEvent := output.Events[len(output.Events)-1]
-		if lastEvent.Timestamp == nil {
-			if startTime != nil {
-				lastEventTimestamp = *startTime
-			} else {
-				lastEventTimestamp = 0
-			}
-		} else {
-			lastEventTimestamp = *lastEvent.Timestamp + 1
-		}
-	} else if startTime != nil {
-		lastEventTimestamp = *startTime
-	} else {
-		lastEventTimestamp = 0
-	}
-
-	return logs, lastEventTimestamp, nil
-}
-
 func GetServiceLogs(ctx context.Context, clients *AWSClients, cluster, service string, startTime *int64) ([]LogEntry, error) {
 	latestTaskDefArn, err := latestTaskDefinitionArn(ctx, cluster, service, clients.ECS)
 	if err != nil {
@@ -139,11 +85,35 @@ func GetServiceLogs(ctx context.Context, clients *AWSClients, cluster, service s
 
 	var allLogs []LogEntry
 	for _, taskArn := range listTasksOutput.TaskArns {
-		logs, _, err := getTaskLogs(ctx, logGroup, logStreamPrefix, taskArn, containerName, startTime, clients.CloudWatchLogs)
+		processID, err := extractARNResource(taskArn)
 		if err != nil {
-			continue
+			continue // Skip tasks with invalid ARNs
 		}
-		allLogs = append(allLogs, logs...)
+
+		input := &cloudwatchlogs.FilterLogEventsInput{
+			LogGroupName:   aws.String(logGroup),
+			LogStreamNames: []string{fmt.Sprintf("%s/%s/%s", logStreamPrefix, containerName, processID)},
+		}
+
+		if startTime != nil {
+			input.StartTime = startTime
+		}
+
+		output, err := clients.CloudWatchLogs.FilterLogEvents(ctx, input)
+		if err != nil {
+			continue // Skip tasks with log filtering errors
+		}
+
+		for _, event := range output.Events {
+			if event.LogStreamName == nil || event.Message == nil || event.Timestamp == nil {
+				continue // Skip events with missing required fields
+			}
+			allLogs = append(allLogs, LogEntry{
+				StreamName: *event.LogStreamName,
+				Message:    *event.Message,
+				Timestamp:  *event.Timestamp,
+			})
+		}
 	}
 
 	return allLogs, nil
