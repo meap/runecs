@@ -32,7 +32,7 @@ Pre-compiled binaries for all platforms are available on our [releases page](htt
 
 ### Docker
 
-RunECS is also available as a Docker image for containerized execution:
+You can also use RunECS as a Docker image for containerized execution:
 
 ```bash
 docker run \
@@ -50,11 +50,11 @@ RunECS supports multiple methods for AWS authentication. See [AWS Authentication
 
 ## Key Features
 
-A complete list of available commands can be obtained by running `runecs --help`. Common use cases are demonstrated below.
+Run `runecs --help` to see all available commands. The examples below demonstrate common use cases.
 
 ### Deploy a Specific Docker Image Tag
 
-A specific Docker image tag or commit SHA can be deployed to an ECS service. This functionality is particularly useful when rollbacks to known-good versions are required or when specific builds need to be deployed:
+Deploy a specific Docker image tag or commit SHA to an ECS service. Use this feature for rollbacks to known-good versions or deploying specific builds:
 
 ```bash
 runecs deploy --service mycanvas-ecs-staging-cluster/web -i 9cd43549f03faf9bbc0ddc3eba8585f00098b240
@@ -62,17 +62,17 @@ runecs deploy --service mycanvas-ecs-staging-cluster/web -i 9cd43549f03faf9bbc0d
 
 ### Run One-Off Commands in ECS
 
-One-off commands can be executed directly in the ECS environment, making it ideal for database migrations, maintenance tasks, or debugging within configured VPC and security groups. Commands are executed with the same network access, environment variables, and IAM permissions as the services:
+Execute one-off commands directly in the ECS environment. This makes database migrations, maintenance tasks, and debugging ideal within configured VPC and security groups. Commands execute with the same network access, environment variables, and IAM permissions as the services:
 
 ```bash
 runecs run "echo \"HELLO WORLD\"" -w --service mycanvas-ecs-staging-cluster/web
 ```
 
-Both AWS Fargate and EC2 capacity providers are supported, with the appropriate launch type being automatically selected based on service configuration. When the `-w` flag is used, task completion is awaited and full output is streamed to the terminal, making it ideal for interactive debugging and migration scripts.
+**RunECS supports both AWS Fargate and EC2 capacity providers.** The tool automatically selects the appropriate launch type based on service configuration. When you use the `-w` flag, RunECS waits for task completion and streams full output to the terminal. This approach works well for interactive debugging and migration scripts.
 
 ### Scale ECS Services
 
-The desired count of tasks for an ECS service can be adjusted instantly:
+Adjust the desired count of tasks for an ECS service instantly:
 
 ```bash
 runecs scale 5 --service mycanvas-ecs-staging-cluster/web
@@ -82,13 +82,13 @@ This command directly modifies the service's desired count using `UpdateService`
 
 ### Restart ECS Services
 
-ECS services can be gracefully restarted without downtime, or immediate task termination can be forced when required:
+Restart ECS services gracefully without downtime, or force immediate task termination when required:
 
 ```bash
 runecs restart --service mycanvas-ecs-staging-cluster/addrp
 ```
 
-By default, a rolling restart is performed, with tasks being replaced one by one to maintain service availability. For situations where immediate task termination is required (such as clearing stuck processes or forcing configuration reloads), the `--kill` flag can be used to terminate all tasks at once, allowing replacements to be spawned according to the service's desired count.
+By default, RunECS performs a rolling restart. Tasks get replaced one by one to maintain service availability. For immediate task termination (such as clearing stuck processes or forcing configuration reloads), use the `--kill` flag to terminate all tasks at once. The service then spawns replacements according to the desired count.
 
 ## FAQ
 
