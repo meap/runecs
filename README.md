@@ -80,6 +80,22 @@ runecs scale 5 --service mycanvas-ecs-staging-cluster/web
 
 This command directly modifies the service's desired count using `UpdateService`, providing immediate scaling without creating task sets or managing deployment configurations.
 
+### View ECS Service Logs
+
+Access CloudWatch logs for your ECS services with built-in streaming capabilities:
+
+```bash
+runecs logs --service mycanvas-ecs-staging-cluster/web
+```
+
+For real-time log monitoring, use the follow flag to stream logs as they are generated:
+
+```bash
+runecs logs -f --service mycanvas-ecs-staging-cluster/web
+```
+
+RunECS automatically discovers CloudWatch log groups and streams associated with your service. The tool fetches logs from all running tasks and displays them chronologically. Without the follow flag, it shows logs from the last hour. With follow mode, it provides real-time streaming until interrupted.
+
 ### Restart ECS Services
 
 Restart ECS services gracefully without downtime, or force immediate task termination when required:

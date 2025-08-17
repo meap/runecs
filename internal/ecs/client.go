@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 // NewAWSClients creates and initializes AWS service clients with shared configuration
@@ -47,6 +48,7 @@ func NewAWSClients(ctx context.Context, profile string) (*AWSClients, error) {
 	return &AWSClients{
 		ECS:            ecs.NewFromConfig(cfg),
 		CloudWatchLogs: cloudwatchlogs.NewFromConfig(cfg),
+		STS:            sts.NewFromConfig(cfg),
 		Region:         cfg.Region,
 	}, nil
 }

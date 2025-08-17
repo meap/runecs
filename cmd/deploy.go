@@ -13,54 +13,57 @@ import (
 )
 
 func newDeployCommand() *cobra.Command {
-	var dockerImageTag string
-
 	cmd := &cobra.Command{
 		Use:                   "deploy",
 		Short:                 "Deploy a new version of the task",
 		DisableFlagsInUseLine: true,
-		PreRunE:               deployPreRunE(&dockerImageTag),
-		RunE:                  deployHandler(&dockerImageTag),
+		PreRunE:               deployPreRunE,
+		RunE:                  deployHandler,
 	}
 
-	cmd.PersistentFlags().StringVarP(&dockerImageTag, "image-tag", "i", "", "docker image tag")
+	cmd.PersistentFlags().StringP("image-tag", "i", "", "docker image tag")
 	return cmd
 }
 
-func deployPreRunE(dockerImageTag *string) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		if *dockerImageTag == "" {
-			return errors.New("--image-tag flag is required")
-		}
-		return nil
+func deployPreRunE(cmd *cobra.Command, args []string) error {
+	dockerImageTag, err := cmd.Flags().GetString("image-tag")
+	if err != nil {
+		return fmt.Errorf("failed to get image-tag flag: %w", err)
 	}
+	if dockerImageTag == "" {
+		return errors.New("--image-tag flag is required")
+	}
+	return nil
 }
 
-func deployHandler(dockerImageTag *string) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		// Set up context that cancels on interrupt signal for cancellable deploy operations
-		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer cancel()
+func deployHandler(cmd *cobra.Command, args []string) error {
+	// Set up context that cancels on interrupt signal for cancellable deploy operations
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
-		profile := rootCmd.Flag("profile").Value.String()
-		clients, err := ecs.NewAWSClients(ctx, profile)
-		if err != nil {
-			return fmt.Errorf("failed to initialize AWS clients: %w", err)
-		}
-
-		cluster, service, err := parseServiceFlag()
-		if err != nil {
-			return err
-		}
-		result, err := ecs.Deploy(ctx, clients, cluster, service, *dockerImageTag)
-		if err != nil {
-			return fmt.Errorf("deploy failed: %w", err)
-		}
-
-		fmt.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
-		fmt.Printf("Service %s has been updated.\n", result.ServiceArn)
-		return nil
+	profile := rootCmd.Flag("profile").Value.String()
+	clients, err := ecs.NewAWSClients(ctx, profile)
+	if err != nil {
+		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
+
+	dockerImageTag, err := cmd.Flags().GetString("image-tag")
+	if err != nil {
+		return fmt.Errorf("failed to get image-tag flag: %w", err)
+	}
+
+	cluster, service, err := parseServiceFlag()
+	if err != nil {
+		return err
+	}
+	result, err := ecs.Deploy(ctx, clients, cluster, service, dockerImageTag)
+	if err != nil {
+		return fmt.Errorf("deploy failed: %w", err)
+	}
+
+	fmt.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
+	fmt.Printf("Service %s has been updated.\n", result.ServiceArn)
+	return nil
 }
 
 func init() {

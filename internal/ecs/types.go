@@ -18,6 +18,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 const (
@@ -28,6 +29,7 @@ const (
 type AWSClients struct {
 	ECS            *ecs.Client
 	CloudWatchLogs *cloudwatchlogs.Client
+	STS            *sts.Client
 	Region         string
 }
 
@@ -48,9 +50,15 @@ type LogEntry struct {
 	Timestamp  int64
 }
 
+// LogStreamPrefix represents log configuration for a container
+type LogStreamPrefix struct {
+	LogGroup      string
+	StreamPrefix  string
+	ContainerName string
+}
+
 // ExecuteResult contains the result of task execution
 type ExecuteResult struct {
-	ServiceName       string
 	TaskDefinition    string
 	TaskArn           string
 	NewTaskDefCreated bool

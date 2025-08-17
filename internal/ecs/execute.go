@@ -21,6 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"runecs.io/v1/internal/utils"
 )
 
@@ -30,23 +31,15 @@ func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (Tas
 		return TaskDefinition{}, err
 	}
 
-	containerDef, err := utils.SafeGetFirstPtr(resp.TaskDefinition.ContainerDefinitions, "no container definitions found")
+	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, client, *taskArn)
 	if err != nil {
-		return TaskDefinition{}, fmt.Errorf("failed to get container definition from task %s: %w", *taskArn, err)
-	}
-
-	if containerDef.Name == nil {
-		return TaskDefinition{}, fmt.Errorf("container definition has no name in task %s", *taskArn)
+		return TaskDefinition{}, err
 	}
 
 	output := TaskDefinition{}
-	output.Name = *containerDef.Name
-
-	logConfig := containerDef.LogConfiguration
-	if logConfig != nil && logConfig.LogDriver == types.LogDriverAwslogs {
-		output.LogGroup = logConfig.Options["awslogs-group"]
-		output.LogStreamPrefix = logConfig.Options["awslogs-stream-prefix"]
-	}
+	output.Name = containerName
+	output.LogGroup = logGroup
+	output.LogStreamPrefix = logStreamPrefix
 
 	if resp.TaskDefinition.Cpu == nil {
 		return TaskDefinition{}, fmt.Errorf("task definition has no CPU specification: %s", *taskArn)
@@ -114,20 +107,68 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 
 // waitForTaskCompletion waits for an ECS task to complete and collects its logs
 func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster string, taskArn string, tdef TaskDefinition, result *ExecuteResult) error {
-	var lastTimestamp *int64 = nil
+	// Get the account ID using STS
+	identity, err := clients.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %w", err)
+	}
 
+	// Extract partition from caller's ARN to handle different AWS partitions
+	partition, err := extractPartitionFromARN(*identity.Arn)
+	if err != nil {
+		return fmt.Errorf("failed to extract partition from caller ARN: %w", err)
+	}
+
+	// Construct the LogGroup ARN with correct partition
+	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, fmt.Sprintf("log-group:%s", tdef.LogGroup))
+
+	// Extract task ID from task ARN for log stream pattern
+	taskID, err := extractARNResource(taskArn)
+	if err != nil {
+		return fmt.Errorf("failed to extract task ID from ARN: %w", err)
+	}
+
+	// Build log stream prefix pattern
+	logStreamPrefixPattern := fmt.Sprintf("%s/%s/%s", tdef.LogStreamPrefix, tdef.Name, taskID)
+
+	// Start tailing logs
+	logChan, closeFunc, err := TailLogGroups(ctx, clients.CloudWatchLogs, []string{logGroupArn}, []string{logStreamPrefixPattern})
+	if err != nil {
+		return fmt.Errorf("failed to start log tailing: %w", err)
+	}
+	defer closeFunc()
+
+	// Inform user about cancellation option
+	fmt.Println("Waiting for task to complete and streaming logs... Press CTRL+C to stop waiting (task will continue running).")
+
+	// Create a context that can be cancelled when task completes
+	taskCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Start goroutine to collect logs
+	logsDone := make(chan struct{})
+	go func() {
+		defer close(logsDone)
+		for {
+			select {
+			case <-taskCtx.Done():
+				return
+			case logEntry, ok := <-logChan:
+				if !ok {
+					return
+				}
+				result.Logs = append(result.Logs, logEntry)
+			}
+		}
+	}()
+
+	// Poll task status
 	for {
 		// Check for context cancellation before each iteration
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-		}
-
-		logs, newTimestamp, err := getTaskLogs(ctx, tdef.LogGroup, tdef.LogStreamPrefix, taskArn, tdef.Name, lastTimestamp, clients.CloudWatchLogs)
-		if err == nil {
-			result.Logs = append(result.Logs, logs...)
-			lastTimestamp = &newTimestamp
 		}
 
 		success, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
@@ -137,6 +178,9 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 
 		if success {
 			result.Finished = true
+			// Cancel the log collection context and wait for it to finish
+			cancel()
+			<-logsDone
 			break
 		}
 
@@ -251,7 +295,6 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	result := &ExecuteResult{
-		ServiceName:       service,
 		TaskDefinition:    taskDef,
 		TaskArn:           *executedTask.TaskArn,
 		NewTaskDefCreated: newTaskDefCreated,
