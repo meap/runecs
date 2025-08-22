@@ -33,10 +33,7 @@ var rootCmd = &cobra.Command{
 		commandsWithoutService := []string{"completion", "help", "list", "version"}
 		serviceValue := cmd.Flag("service").Value.String()
 
-		serviceRequired := true
-		if slices.Contains(commandsWithoutService, cmd.Name()) {
-			serviceRequired = false
-		}
+		serviceRequired := !slices.Contains(commandsWithoutService, cmd.Name())
 
 		if serviceRequired && serviceValue == "" {
 			return errors.New("--service flag is required for this command")
