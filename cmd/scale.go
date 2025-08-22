@@ -51,6 +51,7 @@ func scalePreRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	const minTaskCount = 1
+
 	const maxTaskCount = 1000
 
 	if value < minTaskCount || value > maxTaskCount {

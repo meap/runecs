@@ -35,6 +35,7 @@ func listHandler(cmd *cobra.Command, args []string) error {
 
 	profile := rootCmd.Flag("profile").Value.String()
 	clients, err := ecs.NewAWSClients(ctx, profile)
+
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
@@ -62,6 +63,7 @@ func displayServices(clusters []ecs.ClusterInfo, region string) {
 
 	for _, cluster := range clusters {
 		list := list.New().EnumeratorStyle(enumStyle)
+
 		fmt.Println(cluster.Name)
 
 		for _, service := range cluster.Services {
@@ -87,6 +89,7 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 		for _, service := range cluster.Services {
 			boldServiceName := lipgloss.NewStyle().Bold(true).Render(service.Name)
 			serviceName := fmt.Sprintf("%s/%s", service.ClusterName, boldServiceName)
+
 			for _, task := range service.Tasks {
 				rows = append(rows, []string{
 					serviceName,

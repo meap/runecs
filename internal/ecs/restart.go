@@ -95,6 +95,7 @@ func Restart(ctx context.Context, clients *AWSClients, cluster, service string, 
 
 	if kill {
 		result.Method = "kill"
+
 		stoppedTasks, err := stopAll(ctx, cluster, service, clients.ECS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to stop tasks: %w", err)
@@ -102,6 +103,7 @@ func Restart(ctx context.Context, clients *AWSClients, cluster, service string, 
 		result.StoppedTasks = stoppedTasks
 	} else {
 		result.Method = "force_deploy"
+
 		serviceArn, taskDefinition, err := forceNewDeploy(ctx, cluster, service, clients.ECS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to force new deployment: %w", err)

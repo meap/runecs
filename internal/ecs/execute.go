@@ -147,6 +147,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 
 	// Start goroutine to collect logs
 	logsDone := make(chan struct{})
+
 	go func() {
 		defer close(logsDone)
 		for {
@@ -219,8 +220,11 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 
 	// Extract network configuration if available
 	taskDefArn := latestTaskDefArn
+
 	var subnets []string
+
 	var securityGroups []string
+
 	if serviceInfo.NetworkConfiguration != nil && serviceInfo.NetworkConfiguration.AwsvpcConfiguration != nil {
 		subnets = serviceInfo.NetworkConfiguration.AwsvpcConfiguration.Subnets
 		securityGroups = serviceInfo.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups
@@ -238,6 +242,7 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	var taskDef string
+
 	newTaskDefCreated := false
 
 	if dockerImageTag != "" {
@@ -280,7 +285,6 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	output, err := clients.ECS.RunTask(ctx, runTaskInput)
-
 	if err != nil {
 		return nil, err
 	}

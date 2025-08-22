@@ -88,9 +88,10 @@ func getTaskDetails(ctx context.Context, svc *ecs.Client, cluster string, servic
 	}
 
 	tasks := []TaskInfo{}
+
 	for _, task := range describeTasksOutput.Tasks {
-		// Výpočet délky běhu úlohy
 		var runningTime string
+
 		if task.StartedAt != nil {
 			duration := time.Since(*task.StartedAt)
 			runningTime = formatRunningTime(duration)
@@ -122,6 +123,7 @@ func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([
 	}
 
 	clusters := []ClusterInfo{}
+
 	for _, clusterArn := range clusterArns {
 		serviceArns, err := getServiceArns(ctx, clients.ECS, clusterArn)
 		if err != nil {
@@ -129,6 +131,7 @@ func GetClusters(ctx context.Context, clients *AWSClients, includeTasks bool) ([
 		}
 
 		services := []ServiceInfo{}
+
 		for _, serviceArn := range serviceArns {
 			serviceName, err := extractARNResource(serviceArn)
 			if err != nil {

@@ -32,6 +32,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 	totalCount := 0
 	deleted := 0
 	keep := 0
+
 	var processedTasks []TaskDefinitionPruneEntry
 
 	for {

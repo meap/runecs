@@ -148,6 +148,7 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 		defer stream.Close()
 
 		eventsChan := stream.Events()
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -183,11 +184,13 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 							"context", "CloudWatch logs live tail stream")
 						return
 					}
+
 					if event == nil {
 						slog.Debug(ErrStreamNilEvent,
 							"context", "CloudWatch logs live tail stream")
 						return
 					}
+
 					slog.Warn(ErrStreamUnexpectedEvent,
 						"event_type", fmt.Sprintf("%T", event),
 						"context", "CloudWatch logs live tail stream")

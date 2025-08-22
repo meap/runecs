@@ -57,6 +57,7 @@ func logsHandler(cmd *cobra.Command, args []string) error {
 
 func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service string) error {
 	fmt.Printf("Fetching logs from the last hour for service %s...\n", boldStyle.Render(cluster+"/"+service))
+
 	oneHourAgo := time.Now().Add(-time.Hour).Unix() * 1000
 	logs, err := ecs.GetServiceLogs(ctx, clients, cluster, service, &oneHourAgo)
 	if err != nil {
@@ -87,6 +88,7 @@ func followLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service s
 	if err != nil {
 		return fmt.Errorf("failed to start tailing logs: %w", err)
 	}
+
 	defer closeFunc()
 
 	fmt.Println("Connected. Streaming logs (press Ctrl+C to stop)...")
@@ -101,6 +103,7 @@ func followLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service s
 				fmt.Println("\nLog stream closed")
 				return nil
 			}
+
 			timestamp := time.Unix(log.Timestamp/1000, (log.Timestamp%1000)*1000000)
 			fmt.Printf("%s %s\n", timestamp.Format("2006-01-02 15:04:05"), log.Message)
 		}
