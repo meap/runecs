@@ -11,6 +11,10 @@ linters:
     - err113
     - godot
     - godox
+    - prealloc
+    - varnamelen
+    - gosmopolitan
+    - mnd
 
   exclusions:
     warn-unused: true
