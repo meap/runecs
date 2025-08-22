@@ -50,7 +50,8 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 	}
 
 	newDef := &ecs.RegisterTaskDefinitionInput{}
-	if err := copier.Copy(newDef, response.TaskDefinition); err != nil {
+	err = copier.Copy(newDef, response.TaskDefinition)
+	if err != nil {
 		return "", err
 	}
 

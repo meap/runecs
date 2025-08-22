@@ -308,7 +308,8 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	if waitForCompletion {
-		if err := waitForTaskCompletion(ctx, clients, cluster, *executedTask.TaskArn, tdef, result); err != nil {
+		err = waitForTaskCompletion(ctx, clients, cluster, *executedTask.TaskArn, tdef, result)
+		if err != nil {
 			return result, err
 		}
 	}
