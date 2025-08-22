@@ -45,6 +45,7 @@ func extractPartitionFromARN(arnString string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse ARN %q: %w", arnString, err)
 	}
+
 	return parsedARN.Partition, nil
 }
 
@@ -58,5 +59,6 @@ func buildARN(partition, service, region, accountID, resource string) string {
 		AccountID: accountID,
 		Resource:  resource,
 	}
+
 	return arnStruct.String()
 }

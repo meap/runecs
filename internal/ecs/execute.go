@@ -182,6 +182,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 			// Cancel the log collection context and wait for it to finish
 			cancel()
 			<-logsDone
+
 			break
 		}
 

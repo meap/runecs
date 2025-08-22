@@ -182,12 +182,14 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 						slog.Error(ErrStreamError,
 							"error", err,
 							"context", "CloudWatch logs live tail stream")
+
 						return
 					}
 
 					if event == nil {
 						slog.Debug(ErrStreamNilEvent,
 							"context", "CloudWatch logs live tail stream")
+
 						return
 					}
 

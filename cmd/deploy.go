@@ -35,6 +35,7 @@ func deployPreRunE(cmd *cobra.Command, args []string) error {
 	if dockerImageTag == "" {
 		return errors.New("--image-tag flag is required")
 	}
+
 	return nil
 }
 

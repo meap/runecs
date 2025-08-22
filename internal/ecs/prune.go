@@ -57,6 +57,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 					Reason:  fmt.Sprintf("Failed to describe: %v", err),
 					Family:  family,
 				})
+
 				continue
 			}
 
@@ -68,6 +69,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 					Reason:  "Missing registration date",
 					Family:  family,
 				})
+
 				continue
 			}
 
@@ -83,6 +85,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 					Family:  family,
 				})
 				keep++
+
 				continue
 			}
 
@@ -94,6 +97,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 					Reason:  fmt.Sprintf("newer than %d days", keepDays),
 					Family:  family,
 				})
+
 				continue
 			}
 
@@ -110,6 +114,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 						Family:  family,
 					})
 					deleted-- // Decrement since it wasn't actually deleted
+
 					continue
 				}
 
@@ -139,6 +144,7 @@ func deregisterTaskFamily(ctx context.Context, family string, keepLast int, keep
 	}
 
 	skipped := totalCount - deleted - keep
+
 	return totalCount, deleted, skipped, processedTasks, nil
 }
 

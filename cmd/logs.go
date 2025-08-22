@@ -25,6 +25,7 @@ func newLogsCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolP("follow", "f", false, "follow log output")
+
 	return cmd
 }
 
@@ -66,6 +67,7 @@ func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service str
 
 	if len(logs) == 0 {
 		fmt.Println("No logs found in the last hour")
+
 		return nil
 	}
 
@@ -79,6 +81,7 @@ func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service str
 	}
 
 	fmt.Printf("\nDisplayed %d log entries\n", len(logs))
+
 	return nil
 }
 
@@ -97,10 +100,12 @@ func followLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service s
 		select {
 		case <-ctx.Done():
 			fmt.Println("\nLog stream closed")
+
 			return nil
 		case log, ok := <-logChan:
 			if !ok {
 				fmt.Println("\nLog stream closed")
+
 				return nil
 			}
 

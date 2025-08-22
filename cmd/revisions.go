@@ -27,6 +27,7 @@ func newRevisionsCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().IntP("last", "", 0, "last N revisions")
+
 	return cmd
 }
 
@@ -77,6 +78,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s: %s\n", formattedDate, revision.DockerURI)
 		}
 	}
+
 	return nil
 }
 

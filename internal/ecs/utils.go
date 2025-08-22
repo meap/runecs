@@ -15,10 +15,12 @@ func formatRunningTime(duration time.Duration) string {
 		days := totalHours / 24
 		hours := totalHours % 24
 		minutes := int(duration.Minutes()) % 60
+
 		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
 	} else {
 		hours := totalHours
 		minutes := int(duration.Minutes()) % 60
+
 		return fmt.Sprintf("%dh %dm", hours, minutes)
 	}
 }

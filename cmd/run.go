@@ -26,6 +26,7 @@ func newRunCommand() *cobra.Command {
 
 	cmd.PersistentFlags().BoolP("wait", "w", false, "wait for task to finish")
 	cmd.PersistentFlags().StringP("image-tag", "i", "", "docker image tag")
+
 	return cmd
 }
 
@@ -35,8 +36,10 @@ func parseCommandArgs(args []string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse command: %w", err)
 		}
+
 		return parsed, nil
 	}
+
 	return args, nil
 }
 
@@ -98,6 +101,7 @@ func runHandler(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Task %s finished\n", result.TaskArn)
 		}
 	}
+
 	return nil
 }
 

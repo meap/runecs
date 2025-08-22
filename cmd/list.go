@@ -23,6 +23,7 @@ func newListCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolP("all", "a", false, "include running tasks in output")
+
 	return cmd
 }
 
@@ -104,6 +105,7 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 
 	if len(rows) == 0 {
 		fmt.Println("No running tasks found.")
+
 		return
 	}
 
@@ -117,6 +119,7 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 			if col == 2 || col == 3 || col == 4 {
 				return cellStyle.Align(lipgloss.Right)
 			}
+
 			return cellStyle
 		}).
 		Headers("Service", "Task ID", "CPU", "Memory", "Running Time").

@@ -23,6 +23,7 @@ func newPruneCommand() *cobra.Command {
 	cmd.PersistentFlags().BoolP("dry-run", "", false, "dry run")
 	cmd.PersistentFlags().IntP("keep-last", "", defaultLastNumberOfTasks, "keep last N task definitions")
 	cmd.PersistentFlags().IntP("keep-days", "", defaultLastDays, "keep task definitions older than N days")
+
 	return cmd
 }
 
@@ -86,6 +87,7 @@ func pruneHandler(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Total of %d task definitions. Deleted %d definitions.\n",
 			result.TotalCount, result.DeletedCount)
 	}
+
 	return nil
 }
 
