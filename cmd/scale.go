@@ -45,10 +45,11 @@ func scalePreRunE(cmd *cobra.Command, args []string) error {
 		return errors.New("scale command requires exactly one argument: the desired task count")
 	}
 
-	value, err := strconv.Atoi(args[0])
+	value64, err := strconv.ParseInt(args[0], 10, 32)
 	if err != nil {
 		return fmt.Errorf("invalid scale value: %w", err)
 	}
+	value := int(value64)
 
 	const minTaskCount = 1
 
@@ -62,10 +63,11 @@ func scalePreRunE(cmd *cobra.Command, args []string) error {
 }
 
 func scaleHandler(cmd *cobra.Command, args []string) error {
-	value, err := strconv.Atoi(args[0])
+	value64, err := strconv.ParseInt(args[0], 10, 32)
 	if err != nil {
 		return fmt.Errorf("invalid scale value: %w", err)
 	}
+	value := int32(value64)
 
 	cluster, service, err := parseServiceFlag()
 	if err != nil {
@@ -82,7 +84,7 @@ func scaleHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
-	result, err := ecs.Scale(ctx, clients, cluster, service, int32(value))
+	result, err := ecs.Scale(ctx, clients, cluster, service, value)
 	if err != nil {
 		return fmt.Errorf("failed to scale service: %w", err)
 	}
