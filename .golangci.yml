@@ -16,6 +16,8 @@ linters:
     - gosmopolitan
     - mnd
     - gochecknoinits
+    - depguard
+    - revive
 
   exclusions:
     warn-unused: true

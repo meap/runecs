@@ -48,7 +48,7 @@ func pruneHandler(cmd *cobra.Command, args []string) error {
 	}
 	result, err := ecs.Prune(ctx, clients, cluster, service, keepLastNr, keepDays, dryRun)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to prune service: %w", err)
 	}
 
 	// Display families being processed

@@ -50,7 +50,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) error {
 	}
 	result, err := ecs.Revisions(ctx, clients, cluster, service, revNr)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get revisions: %w", err)
 	}
 
 	// Sort revisions by revision number in descending order

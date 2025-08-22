@@ -76,7 +76,7 @@ func runHandler(cmd *cobra.Command, args []string) error {
 
 	result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, execWait, dockerImageTag)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute command: %w", err)
 	}
 
 	// Display task definition information

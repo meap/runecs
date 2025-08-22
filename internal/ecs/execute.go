@@ -28,7 +28,7 @@ import (
 func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
 	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 	if err != nil {
-		return TaskDefinition{}, err
+		return TaskDefinition{}, fmt.Errorf("failed to describe task definition: %w", err)
 	}
 
 	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, client, *taskArn)
@@ -71,7 +71,7 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 	})
 
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to describe task: %w", err)
 	}
 
 	taskInfo, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")
@@ -168,7 +168,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		// Check for context cancellation before each iteration
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
 		default:
 		}
 
@@ -189,7 +189,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		// Context-aware sleep to allow immediate cancellation
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
 		case <-time.After(5 * time.Second):
 			// Continue polling
 		}
@@ -287,7 +287,7 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 
 	output, err := clients.ECS.RunTask(ctx, runTaskInput)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to run task: %w", err)
 	}
 
 	executedTask, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")

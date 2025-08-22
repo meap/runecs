@@ -27,7 +27,7 @@ func stopAll(ctx context.Context, cluster, service string, client *ecs.Client) (
 		ServiceName: &service,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list tasks: %w", err)
 	}
 
 	var stoppedTasks []StoppedTaskInfo
@@ -72,7 +72,7 @@ func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Cl
 	})
 
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("failed to update service: %w", err)
 	}
 
 	if output.Service == nil {

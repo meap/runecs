@@ -43,7 +43,7 @@ func listHandler(cmd *cobra.Command, args []string) error {
 
 	clusters, err := ecs.GetClusters(ctx, clients, all)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get clusters: %w", err)
 	}
 
 	if all {
