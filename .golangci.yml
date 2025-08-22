@@ -15,6 +15,7 @@ linters:
     - varnamelen
     - gosmopolitan
     - mnd
+    - gochecknoinits
 
   exclusions:
     warn-unused: true
