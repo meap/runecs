@@ -145,7 +145,13 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 
 	go func() {
 		defer close(logChan)
-		defer stream.Close()
+		defer func() {
+			if err := stream.Close(); err != nil {
+				slog.Error("failed to close CloudWatch logs stream",
+					"error", err,
+					"context", "CloudWatch logs live tail stream cleanup")
+			}
+		}()
 
 		eventsChan := stream.Events()
 
@@ -202,7 +208,11 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 	}()
 
 	closeFunc := func() {
-		stream.Close()
+		if err := stream.Close(); err != nil {
+			slog.Error("failed to close CloudWatch logs stream",
+				"error", err,
+				"context", "CloudWatch logs live tail stream manual close")
+		}
 	}
 
 	return logChan, closeFunc, nil
