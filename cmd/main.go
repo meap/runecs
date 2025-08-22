@@ -49,9 +49,10 @@ func init() {
 	rootCmd.PersistentFlags().String("profile", "", "AWS profile to use for credentials")
 }
 
-func parseServiceFlag() (cluster, service string, err error) {
+func parseServiceFlag() (string, string, error) {
 	serviceValue := rootCmd.Flag("service").Value.String()
 
+	var cluster, service string
 	parsed := strings.Split(serviceValue, "/")
 	if len(parsed) == 2 {
 		cluster = parsed[0]

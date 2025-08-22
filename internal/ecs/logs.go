@@ -36,7 +36,7 @@ const (
 	ErrStreamError = "log stream error occurred"
 )
 
-func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionArn string) (logGroup, logStreamPrefix, containerName string, err error) {
+func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionArn string) (string, string, string, error) {
 	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: &taskDefinitionArn,
 	})
@@ -53,7 +53,8 @@ func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionA
 		return "", "", "", fmt.Errorf("container definition has no name in task %s", taskDefinitionArn)
 	}
 
-	containerName = *containerDef.Name
+	var logGroup, logStreamPrefix string
+	containerName := *containerDef.Name
 
 	logConfig := containerDef.LogConfiguration
 	if logConfig != nil && logConfig.LogDriver == ecsTypes.LogDriverAwslogs {
