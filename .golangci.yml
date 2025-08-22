@@ -2,8 +2,15 @@ version: "2"
 linters:
   default: all
   disable:
+    - wsl
     - wsl_v5
     - ireturn
+    - lll
+    - exhaustruct
+    - gochecknoglobals
+    - err113
+    - godot
+    - godox
 
   exclusions:
     warn-unused: true
