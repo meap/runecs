@@ -246,7 +246,7 @@ func TailServiceLogs(ctx context.Context, clients *AWSClients, cluster, service 
 	}
 
 	// Construct the LogGroup ARN with correct partition
-	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, fmt.Sprintf("log-group:%s", logGroup))
+	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, "log-group:"+logGroup)
 
 	// Use LogStreamNamePrefixes to capture all streams for this service's containers
 	logStreamPrefixPattern := fmt.Sprintf("%s/%s/", logStreamPrefix, containerName)

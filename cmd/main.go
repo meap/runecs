@@ -64,7 +64,7 @@ func parseServiceFlag() (cluster, service string, err error) {
 	}
 
 	if cluster == "" || service == "" {
-		return "", "", fmt.Errorf("missing cluster or service configuration")
+		return "", "", errors.New("missing cluster or service configuration")
 	}
 
 	return cluster, service, nil

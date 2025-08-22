@@ -120,7 +120,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 	}
 
 	// Construct the LogGroup ARN with correct partition
-	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, fmt.Sprintf("log-group:%s", tdef.LogGroup))
+	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, "log-group:"+tdef.LogGroup)
 
 	// Extract task ID from task ARN for log stream pattern
 	taskID, err := extractARNResource(taskArn)
