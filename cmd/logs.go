@@ -50,14 +50,14 @@ func logsHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	if follow {
-		return followLogs(ctx, clients, cluster, service)
+		return followLogs(cmd, ctx, clients, cluster, service)
 	}
 
-	return showLogs(ctx, clients, cluster, service)
+	return showLogs(cmd, ctx, clients, cluster, service)
 }
 
-func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service string) error {
-	fmt.Printf("Fetching logs from the last hour for service %s...\n", boldStyle.Render(cluster+"/"+service))
+func showLogs(cmd *cobra.Command, ctx context.Context, clients *ecs.AWSClients, cluster, service string) error {
+	cmd.Printf("Fetching logs from the last hour for service %s...\n", boldStyle.Render(cluster+"/"+service))
 
 	oneHourAgo := time.Now().Add(-time.Hour).Unix() * 1000
 	logs, err := ecs.GetServiceLogs(ctx, clients, cluster, service, &oneHourAgo)
@@ -66,7 +66,7 @@ func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service str
 	}
 
 	if len(logs) == 0 {
-		fmt.Println("No logs found in the last hour")
+		cmd.Println("No logs found in the last hour")
 
 		return nil
 	}
@@ -77,16 +77,16 @@ func showLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service str
 
 	for _, log := range logs {
 		timestamp := time.Unix(log.Timestamp/1000, (log.Timestamp%1000)*1000000)
-		fmt.Printf("%s %s\n", timestamp.Format("2006-01-02 15:04:05"), log.Message)
+		cmd.Printf("%s %s\n", timestamp.Format("2006-01-02 15:04:05"), log.Message)
 	}
 
-	fmt.Printf("\nDisplayed %d log entries\n", len(logs))
+	cmd.Printf("\nDisplayed %d log entries\n", len(logs))
 
 	return nil
 }
 
-func followLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service string) error {
-	fmt.Printf("Starting live tail for service %s...\n", boldStyle.Render(cluster+"/"+service))
+func followLogs(cmd *cobra.Command, ctx context.Context, clients *ecs.AWSClients, cluster, service string) error {
+	cmd.Printf("Starting live tail for service %s...\n", boldStyle.Render(cluster+"/"+service))
 	logChan, closeFunc, err := ecs.TailServiceLogs(ctx, clients, cluster, service)
 	if err != nil {
 		return fmt.Errorf("failed to start tailing logs: %w", err)
@@ -94,23 +94,23 @@ func followLogs(ctx context.Context, clients *ecs.AWSClients, cluster, service s
 
 	defer closeFunc()
 
-	fmt.Println("Connected. Streaming logs (press Ctrl+C to stop)...")
+	cmd.Println("Connected. Streaming logs (press Ctrl+C to stop)...")
 
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("\nLog stream closed")
+			cmd.Println("\nLog stream closed")
 
 			return nil
 		case log, ok := <-logChan:
 			if !ok {
-				fmt.Println("\nLog stream closed")
+				cmd.Println("\nLog stream closed")
 
 				return nil
 			}
 
 			timestamp := time.Unix(log.Timestamp/1000, (log.Timestamp%1000)*1000000)
-			fmt.Printf("%s %s\n", timestamp.Format("2006-01-02 15:04:05"), log.Message)
+			cmd.Printf("%s %s\n", timestamp.Format("2006-01-02 15:04:05"), log.Message)
 		}
 	}
 }

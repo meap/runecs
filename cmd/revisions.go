@@ -73,9 +73,9 @@ func revisionsHandler(cmd *cobra.Command, args []string) error {
 			repo := strings.Join(dockerParts[:len(dockerParts)-1], ":")
 			tag := dockerParts[len(dockerParts)-1]
 			styledTag := boldStyle.Render(tag)
-			fmt.Printf("%s: %s:%s\n", formattedDate, repo, styledTag)
+			cmd.Printf("%s: %s:%s\n", formattedDate, repo, styledTag)
 		} else {
-			fmt.Printf("%s: %s\n", formattedDate, revision.DockerURI)
+			cmd.Printf("%s: %s\n", formattedDate, revision.DockerURI)
 		}
 	}
 

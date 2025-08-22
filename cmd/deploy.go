@@ -68,8 +68,8 @@ func deployHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("deploy failed: %w", err)
 	}
 
-	fmt.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
-	fmt.Printf("Service %s has been updated.\n", result.ServiceArn)
+	cmd.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
+	cmd.Printf("Service %s has been updated.\n", result.ServiceArn)
 
 	return nil
 }

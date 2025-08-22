@@ -47,25 +47,25 @@ func listHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	if all {
-		displayServicesWithDetails(clusters, clients.Region)
+		displayServicesWithDetails(cmd, clusters, clients.Region)
 	} else {
-		displayServices(clusters, clients.Region)
+		displayServices(cmd, clusters, clients.Region)
 	}
 
 	return nil
 }
 
-func displayServices(clusters []ecs.ClusterInfo, region string) {
+func displayServices(cmd *cobra.Command, clusters []ecs.ClusterInfo, region string) {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 	enumStyle := lipgloss.NewStyle().MarginLeft(2).MarginRight(1)
 
-	fmt.Printf("Services in all clusters (region: %s):\n", boldStyle.Render(region))
-	fmt.Println()
+	cmd.Printf("Services in all clusters (region: %s):\n", boldStyle.Render(region))
+	cmd.Println()
 
 	for _, cluster := range clusters {
 		list := list.New().EnumeratorStyle(enumStyle)
 
-		fmt.Println(cluster.Name)
+		cmd.Println(cluster.Name)
 
 		for _, service := range cluster.Services {
 			serviceName := boldStyle.Render(service.Name)
@@ -73,13 +73,13 @@ func displayServices(clusters []ecs.ClusterInfo, region string) {
 		}
 
 		if len(cluster.Services) > 0 {
-			fmt.Println(list)
-			fmt.Println()
+			cmd.Println(list)
+			cmd.Println()
 		}
 	}
 }
 
-func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
+func displayServicesWithDetails(cmd *cobra.Command, clusters []ecs.ClusterInfo, region string) {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 	headerStyle := lipgloss.NewStyle().Bold(true).Align(lipgloss.Center)
 	cellStyle := lipgloss.NewStyle().Padding(0, 1)
@@ -104,7 +104,7 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 	}
 
 	if len(rows) == 0 {
-		fmt.Println("No running tasks found.")
+		cmd.Println("No running tasks found.")
 
 		return
 	}
@@ -125,9 +125,9 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 		Headers("Service", "Task ID", "CPU", "Memory", "Running Time").
 		Rows(rows...)
 
-	fmt.Printf("Services with running tasks (region: %s):\n", boldStyle.Render(region))
-	fmt.Println()
-	fmt.Println(t)
+	cmd.Printf("Services with running tasks (region: %s):\n", boldStyle.Render(region))
+	cmd.Println()
+	cmd.Println(t)
 }
 
 func init() {

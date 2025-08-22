@@ -52,8 +52,8 @@ func pruneHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display families being processed
-	fmt.Printf("Processing %d task definition families: %v\n", len(result.Families), result.Families)
-	fmt.Println()
+	cmd.Printf("Processing %d task definition families: %v\n", len(result.Families), result.Families)
+	cmd.Println()
 
 	// Create lipgloss style for ARN formatting
 	arnStyle := lipgloss.NewStyle().Bold(true)
@@ -62,29 +62,29 @@ func pruneHandler(cmd *cobra.Command, args []string) error {
 	for _, task := range result.ProcessedTasks {
 		switch task.Action {
 		case "kept":
-			fmt.Printf("Task definition %s created %d days ago was skipped (%s)\n",
+			cmd.Printf("Task definition %s created %d days ago was skipped (%s)\n",
 				arnStyle.Render(task.Arn), task.DaysOld, task.Reason)
 		case "deleted":
 			if result.DryRun {
-				fmt.Printf("Task definition %s created %d days ago would be deregistered\n",
+				cmd.Printf("Task definition %s created %d days ago would be deregistered\n",
 					arnStyle.Render(task.Arn), task.DaysOld)
 			} else {
-				fmt.Printf("Task definition %s created %d days ago was deregistered\n",
+				cmd.Printf("Task definition %s created %d days ago was deregistered\n",
 					arnStyle.Render(task.Arn), task.DaysOld)
 			}
 		case "skipped":
-			fmt.Printf("Task definition %s skipped: %s\n", arnStyle.Render(task.Arn), task.Reason)
+			cmd.Printf("Task definition %s skipped: %s\n", arnStyle.Render(task.Arn), task.Reason)
 		}
 	}
 
-	fmt.Println()
+	cmd.Println()
 
 	// Display summary
 	if result.DryRun {
-		fmt.Printf("Total of %d task definitions. Will delete %d definitions.\n",
+		cmd.Printf("Total of %d task definitions. Will delete %d definitions.\n",
 			result.TotalCount, result.DeletedCount)
 	} else {
-		fmt.Printf("Total of %d task definitions. Deleted %d definitions.\n",
+		cmd.Printf("Total of %d task definitions. Deleted %d definitions.\n",
 			result.TotalCount, result.DeletedCount)
 	}
 

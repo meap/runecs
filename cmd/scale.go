@@ -92,7 +92,7 @@ func scaleHandler(cmd *cobra.Command, args []string) error {
 	// Create lipgloss style for service name formatting
 	boldStyle := lipgloss.NewStyle().Bold(true)
 
-	fmt.Printf("Service %s scaled from %d to %d tasks\n",
+	cmd.Printf("Service %s scaled from %d to %d tasks\n",
 		boldStyle.Render(fmt.Sprintf("%s/%s", result.ClusterName, result.ServiceName)),
 		result.PreviousDesiredCount, result.NewDesiredCount)
 
