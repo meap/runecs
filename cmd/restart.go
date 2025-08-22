@@ -21,6 +21,7 @@ func newRestartCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolP("kill", "", false, "Stops running tasks, ECS starts a new one if the health check is properly set")
+
 	return cmd
 }
 
@@ -48,13 +49,14 @@ func restartHandler(cmd *cobra.Command, args []string) error {
 
 	if result.Method == "kill" {
 		for _, stoppedTask := range result.StoppedTasks {
-			fmt.Printf("Stopped task %s started %s\n", stoppedTask.TaskArn, humanize.Time(stoppedTask.StartedAt))
+			cmd.Printf("Stopped task %s started %s\n", stoppedTask.TaskArn, humanize.Time(stoppedTask.StartedAt))
 		}
 	} else {
-		fmt.Printf("Service %s restarted by starting new tasks using task definition %s.\n", service, result.TaskDefinition)
+		cmd.Printf("Service %s restarted by starting new tasks using task definition %s.\n", service, result.TaskDefinition)
 	}
 
-	fmt.Println("Done.")
+	cmd.Println("Done.")
+
 	return nil
 }
 

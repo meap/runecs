@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +21,7 @@ func newVersionCommand() *cobra.Command {
 }
 
 func versionHandler(cmd *cobra.Command, args []string) {
-	fmt.Printf("%s\n", version.Version)
+	cmd.Printf("%s\n", version.Version)
 }
 
 func SetVersion(v *Version) {

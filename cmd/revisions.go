@@ -27,6 +27,7 @@ func newRevisionsCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().IntP("last", "", 0, "last N revisions")
+
 	return cmd
 }
 
@@ -49,7 +50,7 @@ func revisionsHandler(cmd *cobra.Command, args []string) error {
 	}
 	result, err := ecs.Revisions(ctx, clients, cluster, service, revNr)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get revisions: %w", err)
 	}
 
 	// Sort revisions by revision number in descending order
@@ -72,11 +73,12 @@ func revisionsHandler(cmd *cobra.Command, args []string) error {
 			repo := strings.Join(dockerParts[:len(dockerParts)-1], ":")
 			tag := dockerParts[len(dockerParts)-1]
 			styledTag := boldStyle.Render(tag)
-			fmt.Printf("%s: %s:%s\n", formattedDate, repo, styledTag)
+			cmd.Printf("%s: %s:%s\n", formattedDate, repo, styledTag)
 		} else {
-			fmt.Printf("%s: %s\n", formattedDate, revision.DockerURI)
+			cmd.Printf("%s: %s\n", formattedDate, revision.DockerURI)
 		}
 	}
+
 	return nil
 }
 

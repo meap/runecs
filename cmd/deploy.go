@@ -22,6 +22,7 @@ func newDeployCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringP("image-tag", "i", "", "docker image tag")
+
 	return cmd
 }
 
@@ -30,9 +31,11 @@ func deployPreRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get image-tag flag: %w", err)
 	}
+
 	if dockerImageTag == "" {
 		return errors.New("--image-tag flag is required")
 	}
+
 	return nil
 }
 
@@ -42,7 +45,9 @@ func deployHandler(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	profile := rootCmd.Flag("profile").Value.String()
+
 	clients, err := ecs.NewAWSClients(ctx, profile)
+
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
@@ -56,13 +61,16 @@ func deployHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	result, err := ecs.Deploy(ctx, clients, cluster, service, dockerImageTag)
+
 	if err != nil {
 		return fmt.Errorf("deploy failed: %w", err)
 	}
 
-	fmt.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
-	fmt.Printf("Service %s has been updated.\n", result.ServiceArn)
+	cmd.Printf("New task revision %s has been created\n", result.TaskDefinitionArn)
+	cmd.Printf("Service %s has been updated.\n", result.ServiceArn)
+
 	return nil
 }
 

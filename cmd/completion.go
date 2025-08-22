@@ -35,6 +35,7 @@ func completionHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate completion script: %w", err)
 	}
+
 	return nil
 }
 

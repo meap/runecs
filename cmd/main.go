@@ -33,10 +33,7 @@ var rootCmd = &cobra.Command{
 		commandsWithoutService := []string{"completion", "help", "list", "version"}
 		serviceValue := cmd.Flag("service").Value.String()
 
-		serviceRequired := true
-		if slices.Contains(commandsWithoutService, cmd.Name()) {
-			serviceRequired = false
-		}
+		serviceRequired := !slices.Contains(commandsWithoutService, cmd.Name())
 
 		if serviceRequired && serviceValue == "" {
 			return errors.New("--service flag is required for this command")
@@ -52,9 +49,10 @@ func init() {
 	rootCmd.PersistentFlags().String("profile", "", "AWS profile to use for credentials")
 }
 
-func parseServiceFlag() (cluster, service string, err error) {
+func parseServiceFlag() (string, string, error) {
 	serviceValue := rootCmd.Flag("service").Value.String()
 
+	var cluster, service string
 	parsed := strings.Split(serviceValue, "/")
 	if len(parsed) == 2 {
 		cluster = parsed[0]
@@ -64,14 +62,15 @@ func parseServiceFlag() (cluster, service string, err error) {
 	}
 
 	if cluster == "" || service == "" {
-		return "", "", fmt.Errorf("missing cluster or service configuration")
+		return "", "", errors.New("missing cluster or service configuration")
 	}
 
 	return cluster, service, nil
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	err := rootCmd.Execute()
+	if err != nil {
 		os.Exit(1)
 	}
 }

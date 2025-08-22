@@ -29,7 +29,7 @@ func getFamilies(ctx context.Context, familyPrefix string, svc *ecs.Client) ([]s
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list task definition families: %w", err)
 	}
 
 	return response.Families, nil
@@ -41,7 +41,7 @@ func getFamilyPrefix(ctx context.Context, cluster, service string, svc *ecs.Clie
 		Services: []string{service},
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to describe services: %w", err)
 	}
 
 	serviceInfo, err := utils.SafeGetFirstPtr(serviceResponse.Services, "no services found in response")
@@ -54,7 +54,7 @@ func getFamilyPrefix(ctx context.Context, cluster, service string, svc *ecs.Clie
 	})
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to describe task definition: %w", err)
 	}
 
 	if response.TaskDefinition.Family == nil {
@@ -76,7 +76,7 @@ func latestTaskDefinitionArn(ctx context.Context, cluster, service string, svc *
 	})
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to list task definitions: %w", err)
 	}
 
 	arn, err := utils.SafeGetFirst(response.TaskDefinitionArns, "no task definition ARNs found in response")
@@ -100,7 +100,7 @@ func getRevisions(ctx context.Context, familyPrefix string, lastRevisionsNr int,
 		response, err := svc.ListTaskDefinitions(ctx, definitionInput)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to list task definitions: %w", err)
 		}
 
 		for _, def := range response.TaskDefinitionArns {

@@ -36,7 +36,7 @@ const (
 	ErrStreamError = "log stream error occurred"
 )
 
-func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionArn string) (logGroup, logStreamPrefix, containerName string, err error) {
+func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionArn string) (string, string, string, error) {
 	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: &taskDefinitionArn,
 	})
@@ -53,7 +53,8 @@ func getLogStreamPrefix(ctx context.Context, client *ecs.Client, taskDefinitionA
 		return "", "", "", fmt.Errorf("container definition has no name in task %s", taskDefinitionArn)
 	}
 
-	containerName = *containerDef.Name
+	var logGroup, logStreamPrefix string
+	containerName := *containerDef.Name
 
 	logConfig := containerDef.LogConfiguration
 	if logConfig != nil && logConfig.LogDriver == ecsTypes.LogDriverAwslogs {
@@ -145,9 +146,17 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 
 	go func() {
 		defer close(logChan)
-		defer stream.Close()
+		defer func() {
+			err := stream.Close()
+			if err != nil {
+				slog.Error("failed to close CloudWatch logs stream",
+					"error", err,
+					"context", "CloudWatch logs live tail stream cleanup")
+			}
+		}()
 
 		eventsChan := stream.Events()
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -177,17 +186,22 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 						}
 					}
 				default:
-					if err := stream.Err(); err != nil {
+					err := stream.Err()
+					if err != nil {
 						slog.Error(ErrStreamError,
 							"error", err,
 							"context", "CloudWatch logs live tail stream")
+
 						return
 					}
+
 					if event == nil {
 						slog.Debug(ErrStreamNilEvent,
 							"context", "CloudWatch logs live tail stream")
+
 						return
 					}
+
 					slog.Warn(ErrStreamUnexpectedEvent,
 						"event_type", fmt.Sprintf("%T", event),
 						"context", "CloudWatch logs live tail stream")
@@ -197,7 +211,12 @@ func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGrou
 	}()
 
 	closeFunc := func() {
-		stream.Close()
+		err := stream.Close()
+		if err != nil {
+			slog.Error("failed to close CloudWatch logs stream",
+				"error", err,
+				"context", "CloudWatch logs live tail stream manual close")
+		}
 	}
 
 	return logChan, closeFunc, nil
@@ -231,7 +250,7 @@ func TailServiceLogs(ctx context.Context, clients *AWSClients, cluster, service 
 	}
 
 	// Construct the LogGroup ARN with correct partition
-	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, fmt.Sprintf("log-group:%s", logGroup))
+	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, "log-group:"+logGroup)
 
 	// Use LogStreamNamePrefixes to capture all streams for this service's containers
 	logStreamPrefixPattern := fmt.Sprintf("%s/%s/", logStreamPrefix, containerName)

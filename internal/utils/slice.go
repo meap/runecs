@@ -24,6 +24,7 @@ func SafeGetFirstPtr[T any](slice []T, errorMsg string) (*T, error) {
 	if len(slice) == 0 {
 		return nil, errors.New(errorMsg)
 	}
+
 	return &slice[0], nil
 }
 
@@ -34,5 +35,6 @@ func SafeGetFirst[T any](slice []T, errorMsg string) (T, error) {
 	if len(slice) == 0 {
 		return zero, errors.New(errorMsg)
 	}
+
 	return slice[0], nil
 }

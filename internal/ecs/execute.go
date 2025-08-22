@@ -28,7 +28,7 @@ import (
 func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (TaskDefinition, error) {
 	resp, err := client.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{TaskDefinition: taskArn})
 	if err != nil {
-		return TaskDefinition{}, err
+		return TaskDefinition{}, fmt.Errorf("failed to describe task definition: %w", err)
 	}
 
 	logGroup, logStreamPrefix, containerName, err := getLogStreamPrefix(ctx, client, *taskArn)
@@ -71,7 +71,7 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 	})
 
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to describe task: %w", err)
 	}
 
 	taskInfo, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")
@@ -120,7 +120,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 	}
 
 	// Construct the LogGroup ARN with correct partition
-	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, fmt.Sprintf("log-group:%s", tdef.LogGroup))
+	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, "log-group:"+tdef.LogGroup)
 
 	// Extract task ID from task ARN for log stream pattern
 	taskID, err := extractARNResource(taskArn)
@@ -147,6 +147,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 
 	// Start goroutine to collect logs
 	logsDone := make(chan struct{})
+
 	go func() {
 		defer close(logsDone)
 		for {
@@ -167,7 +168,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		// Check for context cancellation before each iteration
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
 		default:
 		}
 
@@ -181,13 +182,14 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 			// Cancel the log collection context and wait for it to finish
 			cancel()
 			<-logsDone
+
 			break
 		}
 
 		// Context-aware sleep to allow immediate cancellation
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
 		case <-time.After(5 * time.Second):
 			// Continue polling
 		}
@@ -219,8 +221,11 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 
 	// Extract network configuration if available
 	taskDefArn := latestTaskDefArn
+
 	var subnets []string
+
 	var securityGroups []string
+
 	if serviceInfo.NetworkConfiguration != nil && serviceInfo.NetworkConfiguration.AwsvpcConfiguration != nil {
 		subnets = serviceInfo.NetworkConfiguration.AwsvpcConfiguration.Subnets
 		securityGroups = serviceInfo.NetworkConfiguration.AwsvpcConfiguration.SecurityGroups
@@ -238,6 +243,7 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	var taskDef string
+
 	newTaskDefCreated := false
 
 	if dockerImageTag != "" {
@@ -280,9 +286,8 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	output, err := clients.ECS.RunTask(ctx, runTaskInput)
-
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to run task: %w", err)
 	}
 
 	executedTask, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")
@@ -303,7 +308,8 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	}
 
 	if waitForCompletion {
-		if err := waitForTaskCompletion(ctx, clients, cluster, *executedTask.TaskArn, tdef, result); err != nil {
+		err = waitForTaskCompletion(ctx, clients, cluster, *executedTask.TaskArn, tdef, result)
+		if err != nil {
 			return result, err
 		}
 	}

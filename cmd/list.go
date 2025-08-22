@@ -23,6 +23,7 @@ func newListCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolP("all", "a", false, "include running tasks in output")
+
 	return cmd
 }
 
@@ -35,34 +36,36 @@ func listHandler(cmd *cobra.Command, args []string) error {
 
 	profile := rootCmd.Flag("profile").Value.String()
 	clients, err := ecs.NewAWSClients(ctx, profile)
+
 	if err != nil {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
 	clusters, err := ecs.GetClusters(ctx, clients, all)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get clusters: %w", err)
 	}
 
 	if all {
-		displayServicesWithDetails(clusters, clients.Region)
+		displayServicesWithDetails(cmd, clusters, clients.Region)
 	} else {
-		displayServices(clusters, clients.Region)
+		displayServices(cmd, clusters, clients.Region)
 	}
 
 	return nil
 }
 
-func displayServices(clusters []ecs.ClusterInfo, region string) {
+func displayServices(cmd *cobra.Command, clusters []ecs.ClusterInfo, region string) {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 	enumStyle := lipgloss.NewStyle().MarginLeft(2).MarginRight(1)
 
-	fmt.Printf("Services in all clusters (region: %s):\n", boldStyle.Render(region))
-	fmt.Println()
+	cmd.Printf("Services in all clusters (region: %s):\n", boldStyle.Render(region))
+	cmd.Println()
 
 	for _, cluster := range clusters {
 		list := list.New().EnumeratorStyle(enumStyle)
-		fmt.Println(cluster.Name)
+
+		cmd.Println(cluster.Name)
 
 		for _, service := range cluster.Services {
 			serviceName := boldStyle.Render(service.Name)
@@ -70,13 +73,13 @@ func displayServices(clusters []ecs.ClusterInfo, region string) {
 		}
 
 		if len(cluster.Services) > 0 {
-			fmt.Println(list)
-			fmt.Println()
+			cmd.Println(list)
+			cmd.Println()
 		}
 	}
 }
 
-func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
+func displayServicesWithDetails(cmd *cobra.Command, clusters []ecs.ClusterInfo, region string) {
 	boldStyle := lipgloss.NewStyle().Bold(true)
 	headerStyle := lipgloss.NewStyle().Bold(true).Align(lipgloss.Center)
 	cellStyle := lipgloss.NewStyle().Padding(0, 1)
@@ -87,6 +90,7 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 		for _, service := range cluster.Services {
 			boldServiceName := lipgloss.NewStyle().Bold(true).Render(service.Name)
 			serviceName := fmt.Sprintf("%s/%s", service.ClusterName, boldServiceName)
+
 			for _, task := range service.Tasks {
 				rows = append(rows, []string{
 					serviceName,
@@ -100,7 +104,8 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 	}
 
 	if len(rows) == 0 {
-		fmt.Println("No running tasks found.")
+		cmd.Println("No running tasks found.")
+
 		return
 	}
 
@@ -114,14 +119,15 @@ func displayServicesWithDetails(clusters []ecs.ClusterInfo, region string) {
 			if col == 2 || col == 3 || col == 4 {
 				return cellStyle.Align(lipgloss.Right)
 			}
+
 			return cellStyle
 		}).
 		Headers("Service", "Task ID", "CPU", "Memory", "Running Time").
 		Rows(rows...)
 
-	fmt.Printf("Services with running tasks (region: %s):\n", boldStyle.Render(region))
-	fmt.Println()
-	fmt.Println(t)
+	cmd.Printf("Services with running tasks (region: %s):\n", boldStyle.Render(region))
+	cmd.Println()
+	cmd.Println(t)
 }
 
 func init() {

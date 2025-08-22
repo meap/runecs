@@ -1,25 +1,23 @@
+version: "2"
 linters:
-  enable-all: true
+  default: all
   disable:
-    - funlen
-    - gochecknoinits
     - wsl
-    - exhaustruct
-    - execinquery
-    - exportloopref
-    - gomnd
-    - copyloopvar
-    - intrange
-    - gochecknoglobals
-    - wrapcheck
-    - err113
-    - depguard
-    - mnd
+    - wsl_v5
+    - ireturn
     - lll
-    - cyclop
-    - revive
+    - exhaustruct
+    - gochecknoglobals
+    - err113
+    - godot
     - godox
-    - gofumpt
-    - gosec
-    - contextcheck
-    - forbidigo
+    - prealloc
+    - varnamelen
+    - gosmopolitan
+    - mnd
+    - gochecknoinits
+    - depguard
+    - revive
+
+  exclusions:
+    warn-unused: true

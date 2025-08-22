@@ -37,7 +37,7 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 	})
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to describe task definition: %w", err)
 	}
 
 	if len(response.TaskDefinition.ContainerDefinitions) > 1 {
@@ -50,8 +50,9 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 	}
 
 	newDef := &ecs.RegisterTaskDefinitionInput{}
-	if err := copier.Copy(newDef, response.TaskDefinition); err != nil {
-		return "", err
+	err = copier.Copy(newDef, response.TaskDefinition)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy task definition: %w", err)
 	}
 
 	if containerDef.Image == nil {
@@ -65,7 +66,7 @@ func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, 
 
 	output, err := svc.RegisterTaskDefinition(ctx, newDef)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to register task definition: %w", err)
 	}
 
 	if output.TaskDefinition == nil || output.TaskDefinition.TaskDefinitionArn == nil {

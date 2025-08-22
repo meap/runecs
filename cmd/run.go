@@ -26,6 +26,7 @@ func newRunCommand() *cobra.Command {
 
 	cmd.PersistentFlags().BoolP("wait", "w", false, "wait for task to finish")
 	cmd.PersistentFlags().StringP("image-tag", "i", "", "docker image tag")
+
 	return cmd
 }
 
@@ -35,8 +36,10 @@ func parseCommandArgs(args []string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse command: %w", err)
 		}
+
 		return parsed, nil
 	}
+
 	return args, nil
 }
 
@@ -73,31 +76,32 @@ func runHandler(cmd *cobra.Command, args []string) error {
 
 	result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, execWait, dockerImageTag)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to execute command: %w", err)
 	}
 
 	// Display task definition information
 	if result.NewTaskDefCreated {
-		fmt.Printf("New task definition %s created\n", result.TaskDefinition)
+		cmd.Printf("New task definition %s created\n", result.TaskDefinition)
 	} else {
-		fmt.Printf("Using task definition %s\n", result.TaskDefinition)
+		cmd.Printf("Using task definition %s\n", result.TaskDefinition)
 	}
 
-	fmt.Println()
+	cmd.Println()
 
 	// Display task execution information
-	fmt.Printf("Task %s executed\n", result.TaskArn)
+	cmd.Printf("Task %s executed\n", result.TaskArn)
 
 	// Display logs if waiting
 	if execWait {
 		for _, logEntry := range result.Logs {
-			fmt.Println(logEntry.StreamName, logEntry.Message)
+			cmd.Println(logEntry.StreamName, logEntry.Message)
 		}
 
 		if result.Finished {
-			fmt.Printf("Task %s finished\n", result.TaskArn)
+			cmd.Printf("Task %s finished\n", result.TaskArn)
 		}
 	}
+
 	return nil
 }
 
