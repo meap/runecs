@@ -23,11 +23,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	defaultLastNumberOfTasks = 50
-	defaultLastDays          = 0
-)
-
 var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		commandsWithoutService := []string{"completion", "help", "list", "version"}

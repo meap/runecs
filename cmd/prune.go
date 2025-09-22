@@ -12,6 +12,11 @@ import (
 	"runecs.io/v1/internal/ecs"
 )
 
+const (
+	defaultLastNumberOfTasks = 50
+	defaultLastDays          = 0
+)
+
 func newPruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "prune",
