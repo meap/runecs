@@ -70,6 +70,20 @@ runecs run "echo \"HELLO WORLD\"" -w --service mycanvas-ecs-staging-cluster/web
 
 **RunECS supports both AWS Fargate and EC2 capacity providers.** The tool automatically selects the appropriate launch type based on service configuration. When you use the `-w` flag, RunECS waits for task completion and streams full output to the terminal. This approach works well for interactive debugging and migration scripts.
 
+#### CPU and Memory Overrides
+
+One-off tasks often need different resources than the service defaults. A database migration might require more memory, while a lightweight health check needs far less CPU. Use the `--cpu` and `--memory` flags to override resource allocation per task without modifying the task definition:
+
+```bash
+# Run a memory-intensive migration with 4 GB of memory
+runecs run "bin/rails db:migrate" -w --memory 4GB --service mycanvas-ecs-staging-cluster/web
+
+# Run a CPU-intensive data export with 1024 CPU units
+runecs run "bin/export" -w --cpu 1024 --service mycanvas-ecs-staging-cluster/web
+```
+
+The `--cpu` (`-c`) flag accepts CPU units as integers (e.g., 256, 512, 1024). The `--memory` (`-m`) flag accepts values in MiB (e.g., 512, 1024) or with a GB suffix (e.g., 1GB, 2GB).
+
 ### Scale ECS Services
 
 Adjust the desired count of tasks for an ECS service instantly:
