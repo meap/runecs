@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/buildkite/shellwords"
 	"github.com/spf13/cobra"
 	"runecs.io/v1/internal/ecs"
+	"runecs.io/v1/internal/utils"
 )
 
 func newRunCommand() *cobra.Command {
@@ -26,6 +28,8 @@ func newRunCommand() *cobra.Command {
 
 	cmd.PersistentFlags().BoolP("wait", "w", false, "wait for task to finish")
 	cmd.PersistentFlags().StringP("image-tag", "i", "", "docker image tag")
+	cmd.PersistentFlags().StringP("cpu", "c", "", "CPU override for task (e.g., 256, 512, 1024)")
+	cmd.PersistentFlags().StringP("memory", "m", "", "memory override for task (e.g., 512, 1024, 1GB, 2GB)")
 
 	return cmd
 }
@@ -69,12 +73,35 @@ func runHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get image-tag flag: %w", err)
 	}
 
+	cpuOverride, err := cmd.Flags().GetString("cpu")
+	if err != nil {
+		return fmt.Errorf("failed to get cpu flag: %w", err)
+	}
+
+	memoryOverride, err := cmd.Flags().GetString("memory")
+	if err != nil {
+		return fmt.Errorf("failed to get memory flag: %w", err)
+	}
+
+	// Validate that override values are numeric when provided
+	if cpuOverride != "" {
+		if _, err := strconv.Atoi(cpuOverride); err != nil {
+			return fmt.Errorf("invalid cpu value %q: must be a numeric string (e.g., 256, 512, 1024)", cpuOverride)
+		}
+	}
+	if memoryOverride != "" {
+		memoryOverride, err = utils.ParseMemory(memoryOverride)
+		if err != nil {
+			return err
+		}
+	}
+
 	parsedArgs, err := parseCommandArgs(args)
 	if err != nil {
 		return fmt.Errorf("error parsing command arguments: %w", err)
 	}
 
-	result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, execWait, dockerImageTag)
+	result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, execWait, dockerImageTag, cpuOverride, memoryOverride)
 	if err != nil {
 		return fmt.Errorf("failed to execute command: %w", err)
 	}
@@ -84,6 +111,14 @@ func runHandler(cmd *cobra.Command, args []string) error {
 		cmd.Printf("New task definition %s created\n", result.TaskDefinition)
 	} else {
 		cmd.Printf("Using task definition %s\n", result.TaskDefinition)
+	}
+
+	// Display resource overrides when applied
+	if cpuOverride != "" {
+		cmd.Printf("CPU override: %s\n", cpuOverride)
+	}
+	if memoryOverride != "" {
+		cmd.Printf("Memory override: %s MiB\n", memoryOverride)
 	}
 
 	cmd.Println()

@@ -17,8 +17,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
@@ -198,7 +200,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 	return nil
 }
 
-func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string) (*ExecuteResult, error) {
+func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string, cpuOverride, memoryOverride string) (*ExecuteResult, error) {
 	// Describe the service to get its configuration
 	resp, err := clients.ECS.DescribeServices(ctx, &ecs.DescribeServicesInput{
 		Cluster:  &cluster,
@@ -256,15 +258,32 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 		taskDef = taskDefArn
 	}
 
+	containerOverride := types.ContainerOverride{
+		Name:    &tdef.Name,
+		Command: cmd,
+	}
+
+	taskOverride := &types.TaskOverride{
+		ContainerOverrides: []types.ContainerOverride{containerOverride},
+	}
+
+	// Apply CPU/memory overrides at both the task and container level.
+	// Task-level overrides use *string, container-level overrides use *int32.
+	if cpuOverride != "" {
+		taskOverride.Cpu = aws.String(cpuOverride)
+		cpuInt, _ := strconv.ParseInt(cpuOverride, 10, 32)
+		taskOverride.ContainerOverrides[0].Cpu = aws.Int32(int32(cpuInt))
+	}
+	if memoryOverride != "" {
+		taskOverride.Memory = aws.String(memoryOverride)
+		memInt, _ := strconv.ParseInt(memoryOverride, 10, 32)
+		taskOverride.ContainerOverrides[0].Memory = aws.Int32(int32(memInt))
+	}
+
 	runTaskInput := &ecs.RunTaskInput{
 		Cluster:        &cluster,
 		TaskDefinition: &taskDef,
-		Overrides: &types.TaskOverride{
-			ContainerOverrides: []types.ContainerOverride{{
-				Name:    &tdef.Name,
-				Command: cmd,
-			}},
-		},
+		Overrides:      taskOverride,
 	}
 
 	// Use CapacityProviderStrategy if available, otherwise use LaunchType
