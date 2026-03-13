@@ -24,6 +24,20 @@ const (
 	mibPerGB = 1024
 )
 
+// ParseCPU validates a CPU override string.
+// Accepts positive integer strings representing CPU units (e.g., "256", "1024").
+func ParseCPU(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	cpu, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("invalid cpu value %q: must be a positive integer (e.g., 256, 512, 1024)", value)
+	}
+	if cpu <= 0 {
+		return "", fmt.Errorf("invalid cpu value %q: must be a positive integer (e.g., 256, 512, 1024)", value)
+	}
+	return trimmed, nil
+}
+
 // ParseMemory converts a memory string to MiB.
 // Accepts plain numbers (treated as MiB) or suffixed values like "1GB", "2gb".
 func ParseMemory(value string) (string, error) {
@@ -34,12 +48,19 @@ func ParseMemory(value string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("invalid memory value %q: number before 'GB' must be an integer", value)
 		}
+		if gb <= 0 {
+			return "", fmt.Errorf("invalid memory value %q: must be a positive number (e.g., 512, 1024, 1GB, 2GB)", value)
+		}
 		return strconv.Itoa(gb * mibPerGB), nil
 	}
 
-	if _, err := strconv.Atoi(lower); err != nil {
+	mib, err := strconv.Atoi(lower)
+	if err != nil {
 		return "", fmt.Errorf("invalid memory value %q: must be a number in MiB or use GB suffix (e.g., 512, 1024, 1GB, 2GB)", value)
 	}
+	if mib <= 0 {
+		return "", fmt.Errorf("invalid memory value %q: must be a positive number (e.g., 512, 1024, 1GB, 2GB)", value)
+	}
 
-	return value, nil
+	return lower, nil
 }

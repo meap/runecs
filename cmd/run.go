@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 
 	"github.com/buildkite/shellwords"
@@ -85,8 +84,9 @@ func runHandler(cmd *cobra.Command, args []string) error {
 
 	// Validate that override values are numeric when provided
 	if cpuOverride != "" {
-		if _, err := strconv.Atoi(cpuOverride); err != nil {
-			return fmt.Errorf("invalid cpu value %q: must be a numeric string (e.g., 256, 512, 1024)", cpuOverride)
+		cpuOverride, err = utils.ParseCPU(cpuOverride)
+		if err != nil {
+			return err
 		}
 	}
 	if memoryOverride != "" {
