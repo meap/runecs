@@ -271,12 +271,18 @@ func Execute(ctx context.Context, clients *AWSClients, cluster, service string, 
 	// Task-level overrides use *string, container-level overrides use *int32.
 	if cpuOverride != "" {
 		taskOverride.Cpu = aws.String(cpuOverride)
-		cpuInt, _ := strconv.ParseInt(cpuOverride, 10, 32)
+		cpuInt, err := strconv.ParseInt(cpuOverride, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid cpu override value %q: %w", cpuOverride, err)
+		}
 		taskOverride.ContainerOverrides[0].Cpu = aws.Int32(int32(cpuInt))
 	}
 	if memoryOverride != "" {
 		taskOverride.Memory = aws.String(memoryOverride)
-		memInt, _ := strconv.ParseInt(memoryOverride, 10, 32)
+		memInt, err := strconv.ParseInt(memoryOverride, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid memory override value %q: %w", memoryOverride, err)
+		}
 		taskOverride.ContainerOverrides[0].Memory = aws.Int32(int32(memInt))
 	}
 
