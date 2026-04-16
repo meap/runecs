@@ -130,6 +130,47 @@ func GetServiceLogs(ctx context.Context, clients *AWSClients, cluster, service s
 	return allLogs, nil
 }
 
+// fetchTaskLogs retrieves all log events for a single CloudWatch log stream,
+// paginating through every page so the result is the complete log for the
+// task identified by logStreamName. startTime is a unix-millisecond cutoff;
+// events older than it are skipped server-side.
+func fetchTaskLogs(ctx context.Context, cwClient *cloudwatchlogs.Client, logGroup, logStreamName string, startTime int64) ([]LogEntry, error) {
+	var (
+		logs      []LogEntry
+		nextToken *string
+	)
+
+	for {
+		output, err := cwClient.FilterLogEvents(ctx, &cloudwatchlogs.FilterLogEventsInput{
+			LogGroupName:   aws.String(logGroup),
+			LogStreamNames: []string{logStreamName},
+			StartTime:      aws.Int64(startTime),
+			NextToken:      nextToken,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch log events from stream %s: %w", logStreamName, err)
+		}
+
+		for _, event := range output.Events {
+			if event.LogStreamName == nil || event.Message == nil || event.Timestamp == nil {
+				continue
+			}
+			logs = append(logs, LogEntry{
+				StreamName: *event.LogStreamName,
+				Message:    *event.Message,
+				Timestamp:  *event.Timestamp,
+			})
+		}
+
+		if output.NextToken == nil || *output.NextToken == "" {
+			break
+		}
+		nextToken = output.NextToken
+	}
+
+	return logs, nil
+}
+
 func TailLogGroups(ctx context.Context, cwClient *cloudwatchlogs.Client, logGroupIdentifiers []string, logStreamPrefixes []string) (<-chan LogEntry, func(), error) {
 	startLiveTailInput := &cloudwatchlogs.StartLiveTailInput{
 		LogGroupIdentifiers:   logGroupIdentifiers,

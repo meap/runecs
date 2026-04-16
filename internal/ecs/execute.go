@@ -23,7 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"runecs.io/v1/internal/utils"
 )
 
@@ -107,95 +106,72 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 	return *taskInfo.LastStatus == "STOPPED", nil
 }
 
-// waitForTaskCompletion waits for an ECS task to complete and collects its logs
+// logDeliveryGracePeriod is how long we wait after the task reaches STOPPED
+// before fetching logs, giving CloudWatch Logs time to receive the final
+// events from the stopped container.
+const logDeliveryGracePeriod = 5 * time.Second
+
+// taskStatusPollInterval is the cadence at which the task status is polled.
+const taskStatusPollInterval = 5 * time.Second
+
+// waitForTaskCompletion polls until the ECS task reaches STOPPED, then fetches
+// the task's complete log via FilterLogEvents. Live Tail is intentionally not
+// used here: it would miss events emitted before the tail session is
+// established and any in-flight events at the moment the task stops.
 func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster string, taskArn string, tdef TaskDefinition, result *ExecuteResult) error {
-	// Get the account ID using STS
-	identity, err := clients.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-	if err != nil {
-		return fmt.Errorf("failed to get caller identity: %w", err)
-	}
-
-	// Extract partition from caller's ARN to handle different AWS partitions
-	partition, err := extractPartitionFromARN(*identity.Arn)
-	if err != nil {
-		return fmt.Errorf("failed to extract partition from caller ARN: %w", err)
-	}
-
-	// Construct the LogGroup ARN with correct partition
-	logGroupArn := buildARN(partition, "logs", clients.Region, *identity.Account, "log-group:"+tdef.LogGroup)
-
-	// Extract task ID from task ARN for log stream pattern
 	taskID, err := extractARNResource(taskArn)
 	if err != nil {
 		return fmt.Errorf("failed to extract task ID from ARN: %w", err)
 	}
 
-	// Build log stream prefix pattern
-	logStreamPrefixPattern := fmt.Sprintf("%s/%s/%s", tdef.LogStreamPrefix, tdef.Name, taskID)
+	logStreamName := fmt.Sprintf("%s/%s/%s", tdef.LogStreamPrefix, tdef.Name, taskID)
 
-	// Start tailing logs
-	logChan, closeFunc, err := TailLogGroups(ctx, clients.CloudWatchLogs, []string{logGroupArn}, []string{logStreamPrefixPattern})
-	if err != nil {
-		return fmt.Errorf("failed to start log tailing: %w", err)
-	}
-	defer closeFunc()
+	// Capture a start time before polling so the post-completion log fetch
+	// covers the full task lifetime even if its clock drifts slightly.
+	startTimeMillis := time.Now().Add(-time.Minute).UnixMilli()
 
-	// Inform user about cancellation option
-	fmt.Println("Waiting for task to complete and streaming logs... Press CTRL+C to stop waiting (task will continue running).")
+	fmt.Println("Waiting for task to complete... Press CTRL+C to stop waiting (task will continue running).")
 
-	// Create a context that can be cancelled when task completes
-	taskCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Start goroutine to collect logs
-	logsDone := make(chan struct{})
-
-	go func() {
-		defer close(logsDone)
-		for {
-			select {
-			case <-taskCtx.Done():
-				return
-			case logEntry, ok := <-logChan:
-				if !ok {
-					return
-				}
-				result.Logs = append(result.Logs, logEntry)
-			}
-		}
-	}()
-
-	// Poll task status
 	for {
-		// Check for context cancellation before each iteration
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
 		default:
 		}
 
-		success, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
+		stopped, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
 		if err != nil {
 			return err
 		}
 
-		if success {
+		if stopped {
 			result.Finished = true
-			// Cancel the log collection context and wait for it to finish
-			cancel()
-			<-logsDone
 
 			break
 		}
 
-		// Context-aware sleep to allow immediate cancellation
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
-		case <-time.After(5 * time.Second):
-			// Continue polling
+		case <-time.After(taskStatusPollInterval):
 		}
 	}
+
+	// Grace period: CloudWatch Logs delivery lags container output by a few
+	// seconds. Fetching immediately on STOPPED would race against the final
+	// log batch and return an incomplete log.
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled while waiting for log delivery: %w", ctx.Err())
+	case <-time.After(logDeliveryGracePeriod):
+	}
+
+	logs, err := fetchTaskLogs(ctx, clients.CloudWatchLogs, tdef.LogGroup, logStreamName, startTimeMillis)
+	if err != nil {
+		return fmt.Errorf("failed to fetch task logs: %w", err)
+	}
+
+	result.Logs = logs
 
 	return nil
 }
