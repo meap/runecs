@@ -24,7 +24,7 @@ builds:
     ldflags: -s -w -extldflags "-static" -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}.
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     # this name template makes the OS and Arch compatible with the results of uname.
     name_template: >-
       {{ .ProjectName }}_
@@ -36,7 +36,7 @@ archives:
     # use zip for windows archives
     format_overrides:
     - goos: windows
-      format: zip
+      formats: [zip]
 
 checksum:
   name_template: 'checksums.txt'
@@ -49,15 +49,15 @@ report_sizes: true
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
 
-brews:
-  - 
-    name: runecs
+homebrew_casks:
+  - name: runecs
     description: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster
     homepage: https://github.com/meap/runecs
+    binaries:
+      - runecs
     commit_author:
       name: meap
       email: petr@tapmates.com
-    license: "Apache-2.0"
     repository:
       owner: meap
       name: homebrew-runecs
