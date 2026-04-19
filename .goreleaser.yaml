@@ -49,6 +49,9 @@ report_sizes: true
 metadata:
   mod_timestamp: "{{ .CommitTimestamp }}"
 
+changelog:
+  disable: true
+
 homebrew_casks:
   - name: runecs
     description: Effortlessly Execute One-Off Tasks and Database Migrations in Your ECS Cluster
