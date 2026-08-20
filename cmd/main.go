@@ -30,6 +30,13 @@ var rootCmd = &cobra.Command{
 
 		serviceRequired := !slices.Contains(commandsWithoutService, cmd.Name())
 
+		if clusterFlag := cmd.Flags().Lookup("cluster"); clusterFlag != nil && clusterFlag.Value.String() != "" {
+			if serviceValue != "" {
+				return errors.New("--service and --cluster are mutually exclusive")
+			}
+			serviceRequired = false
+		}
+
 		if serviceRequired && serviceValue == "" {
 			return errors.New("--service flag is required for this command")
 		}

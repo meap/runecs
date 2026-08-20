@@ -90,6 +90,34 @@ func forceNewDeploy(ctx context.Context, cluster, service string, client *ecs.Cl
 	return *output.Service.ServiceArn, *output.Service.TaskDefinition, nil
 }
 
+func RestartCluster(ctx context.Context, clients *AWSClients, cluster string, kill bool) (*ClusterRestartResult, error) {
+	serviceArns, err := getServiceArns(ctx, clients.ECS, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &ClusterRestartResult{
+		Cluster:  cluster,
+		Services: nil,
+	}
+
+	for _, serviceArn := range serviceArns {
+		serviceName, err := extractARNResource(serviceArn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract service name from ARN %s: %w", serviceArn, err)
+		}
+
+		restartResult, err := Restart(ctx, clients, cluster, serviceName, kill)
+		result.Services = append(result.Services, ServiceRestartResult{
+			Service: serviceName,
+			Result:  restartResult,
+			Err:     err,
+		})
+	}
+
+	return result, nil
+}
+
 func Restart(ctx context.Context, clients *AWSClients, cluster, service string, kill bool) (*RestartResult, error) {
 	result := &RestartResult{}
 

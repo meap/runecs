@@ -93,6 +93,19 @@ type RestartResult struct {
 	Method         string // "kill" or "force_deploy"
 }
 
+// ServiceRestartResult contains the restart outcome for a single service during a cluster restart
+type ServiceRestartResult struct {
+	Service string
+	Result  *RestartResult
+	Err     error
+}
+
+// ClusterRestartResult contains the result of restarting all services in a cluster
+type ClusterRestartResult struct {
+	Cluster  string
+	Services []ServiceRestartResult
+}
+
 // StoppedTaskInfo represents information about a stopped task
 type StoppedTaskInfo struct {
 	TaskArn   string

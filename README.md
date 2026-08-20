@@ -120,6 +120,14 @@ runecs restart --service mycanvas-ecs-staging-cluster/addrp
 
 By default, RunECS performs a rolling restart. Tasks get replaced one by one to maintain service availability. For immediate task termination (such as clearing stuck processes or forcing configuration reloads), use the `--kill` flag to terminate all tasks at once. The service then spawns replacements according to the desired count.
 
+To restart every service in a cluster at once, use the `--cluster` flag instead of `--service`:
+
+```bash
+runecs restart --cluster mycanvas-ecs-staging-cluster
+```
+
+Services are restarted sequentially, and the `--kill` flag applies to all of them. A failure in one service does not stop the others; the command reports failed services and exits with a non-zero status if any restart failed.
+
 ## FAQ
 
 #### How does this differ from AWS CLI?

@@ -15,12 +15,13 @@ import (
 func newRestartCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "restart",
-		Short:                 "Restart the service",
+		Short:                 "Restart the service, or all services in a cluster",
 		DisableFlagsInUseLine: true,
 		RunE:                  restartHandler,
 	}
 
 	cmd.PersistentFlags().BoolP("kill", "", false, "Stops running tasks, ECS starts a new one if the health check is properly set")
+	cmd.PersistentFlags().String("cluster", "", "Restart all services in the given cluster (mutually exclusive with --service)")
 
 	return cmd
 }
@@ -38,6 +39,10 @@ func restartHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize AWS clients: %w", err)
 	}
 
+	if clusterName, _ := cmd.Flags().GetString("cluster"); clusterName != "" {
+		return restartCluster(ctx, cmd, clients, clusterName, kill)
+	}
+
 	cluster, service, err := parseServiceFlag()
 	if err != nil {
 		return err
@@ -53,6 +58,43 @@ func restartHandler(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		cmd.Printf("Service %s restarted by starting new tasks using task definition %s.\n", service, result.TaskDefinition)
+	}
+
+	cmd.Println("Done.")
+
+	return nil
+}
+
+func restartCluster(ctx context.Context, cmd *cobra.Command, clients *ecs.AWSClients, clusterName string, kill bool) error {
+	result, err := ecs.RestartCluster(ctx, clients, clusterName, kill)
+	if err != nil {
+		return fmt.Errorf("cluster restart failed: %w", err)
+	}
+
+	if len(result.Services) == 0 {
+		return fmt.Errorf("no services found in cluster %s", clusterName)
+	}
+
+	failed := 0
+	for _, svc := range result.Services {
+		if svc.Err != nil {
+			failed++
+			cmd.Printf("Service %s: restart failed: %v\n", svc.Service, svc.Err)
+
+			continue
+		}
+
+		if svc.Result.Method == "kill" {
+			for _, stoppedTask := range svc.Result.StoppedTasks {
+				cmd.Printf("Service %s: stopped task %s started %s\n", svc.Service, stoppedTask.TaskArn, humanize.Time(stoppedTask.StartedAt))
+			}
+		} else {
+			cmd.Printf("Service %s restarted by starting new tasks using task definition %s.\n", svc.Service, svc.Result.TaskDefinition)
+		}
+	}
+
+	if failed > 0 {
+		return fmt.Errorf("%d of %d services failed to restart", failed, len(result.Services))
 	}
 
 	cmd.Println("Done.")
