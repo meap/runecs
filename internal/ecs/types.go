@@ -90,6 +90,7 @@ type RestartResult struct {
 	StoppedTasks   []StoppedTaskInfo
 	ServiceArn     string
 	TaskDefinition string
+	DeploymentID   string // ID of the deployment started by force_deploy
 	Method         string // "kill" or "force_deploy"
 }
 

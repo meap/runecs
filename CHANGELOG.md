@@ -5,6 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### New
+- `restart` now accepts `--wait` (`-w`) to block until the new deployment of the service (or of every service with `--cluster`) has completed. Fails on rollout failure or circuit-breaker rollback, and times out after 30 minutes. Not supported with `--kill` (a warning is printed and the command does not wait).
+
 ## [0.10.0] - 2026-04-19
 
 ### New
