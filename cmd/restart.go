@@ -22,12 +22,20 @@ func newRestartCommand() *cobra.Command {
 
 	cmd.PersistentFlags().BoolP("kill", "", false, "Stops running tasks, ECS starts a new one if the health check is properly set")
 	cmd.PersistentFlags().String("cluster", "", "Restart all services in the given cluster (mutually exclusive with --service)")
+	cmd.PersistentFlags().BoolP("wait", "w", false, "Wait until new tasks of the service(s) are running (not supported with --kill)")
 
 	return cmd
 }
 
 func restartHandler(cmd *cobra.Command, args []string) error {
 	kill, _ := cmd.Flags().GetBool("kill")
+	wait, _ := cmd.Flags().GetBool("wait")
+
+	if kill && wait {
+		cmd.PrintErrln("Warning: --wait is not supported with --kill, not waiting.")
+
+		wait = false
+	}
 
 	// Set up context that cancels on interrupt signal for cancellable restart operations
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -40,14 +48,14 @@ func restartHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	if clusterName, _ := cmd.Flags().GetString("cluster"); clusterName != "" {
-		return restartCluster(ctx, cmd, clients, clusterName, kill)
+		return restartCluster(ctx, cmd, clients, clusterName, kill, wait)
 	}
 
 	cluster, service, err := parseServiceFlag()
 	if err != nil {
 		return err
 	}
-	result, err := ecs.Restart(ctx, clients, cluster, service, kill)
+	result, err := ecs.Restart(ctx, clients, cluster, service, kill, wait)
 	if err != nil {
 		return fmt.Errorf("restart failed: %w", err)
 	}
@@ -65,8 +73,8 @@ func restartHandler(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func restartCluster(ctx context.Context, cmd *cobra.Command, clients *ecs.AWSClients, clusterName string, kill bool) error {
-	result, err := ecs.RestartCluster(ctx, clients, clusterName, kill)
+func restartCluster(ctx context.Context, cmd *cobra.Command, clients *ecs.AWSClients, clusterName string, kill, wait bool) error {
+	result, err := ecs.RestartCluster(ctx, clients, clusterName, kill, wait)
 	if err != nil {
 		return fmt.Errorf("cluster restart failed: %w", err)
 	}

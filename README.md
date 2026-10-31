@@ -128,6 +128,14 @@ runecs restart --cluster mycanvas-ecs-staging-cluster
 
 Services are restarted sequentially, and the `--kill` flag applies to all of them. A failure in one service does not stop the others; the command reports failed services and exits with a non-zero status if any restart failed.
 
+To block until the new tasks are running, add the `--wait` flag (works with both `--service` and `--cluster`):
+
+```bash
+runecs restart --wait --service mycanvas-ecs-staging-cluster/addrp
+```
+
+RunECS tracks the new deployment and exits once its rollout completes. It exits with a non-zero status if the deployment fails, is rolled back by the circuit breaker, or does not finish within 30 minutes. In cluster mode, all services are restarted first and then awaited together. Waiting is not supported with `--kill`; in that case RunECS prints a warning and does not wait.
+
 ## FAQ
 
 #### How does this differ from AWS CLI?
