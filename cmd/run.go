@@ -11,9 +11,9 @@ import (
 	"syscall"
 
 	"github.com/buildkite/shellwords"
+	"github.com/meap/runecs/internal/ecs"
+	"github.com/meap/runecs/internal/utils"
 	"github.com/spf13/cobra"
-	"runecs.io/v1/internal/ecs"
-	"runecs.io/v1/internal/utils"
 )
 
 func newRunCommand() *cobra.Command {

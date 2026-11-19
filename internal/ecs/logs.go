@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	ecsTypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
-	"runecs.io/v1/internal/utils"
+	"github.com/meap/runecs/internal/utils"
 )
 
 const (

@@ -14,7 +14,7 @@
 package main
 
 import (
-	"runecs.io/v1/cmd"
+	"github.com/meap/runecs/cmd"
 )
 
 var (

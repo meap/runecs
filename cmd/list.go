@@ -10,8 +10,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/list"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/meap/runecs/internal/ecs"
 	"github.com/spf13/cobra"
-	"runecs.io/v1/internal/ecs"
 )
 
 func newListCommand() *cobra.Command {
