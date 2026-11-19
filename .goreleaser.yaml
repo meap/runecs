@@ -58,6 +58,13 @@ homebrew_casks:
     homepage: https://github.com/meap/runecs
     binaries:
       - runecs
+    # The darwin binary is not notarized; strip the quarantine flag so Gatekeeper doesn't block it.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/runecs"]
+          end
     commit_author:
       name: meap
       email: petr@tapmates.com
