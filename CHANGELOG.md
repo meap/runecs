@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-11-19
+
 ### Fixed
 - `run --wait` no longer fails when ECS does not yet return a task it has just started. ECS is eventually consistent, so `DescribeTasks` can briefly report the new task as missing; runecs now re-checks the same task with a growing delay (1 s up to 5 s) for up to 2 minutes before giving up. Previously it stopped waiting at once, while the task kept running.
 
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `make lint` target.
 - Internal cleanup of prune defaults.
 
+[0.11.2]: https://github.com/meap/runecs/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/meap/runecs/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/meap/runecs/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/meap/runecs/compare/v0.9...v0.10.0
