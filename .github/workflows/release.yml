@@ -3,13 +3,14 @@ name: runecs
 on:
   push:
     tags:
-      - '*'
+      - 'v*.*.*'
 
 permissions:
   contents: write
 
 jobs:
   build-and-push-docker-image:
+    needs: goreleaser
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -58,7 +59,13 @@ jobs:
           go-version: '>=1.25'
           cache: true
       - name: Extract release notes from CHANGELOG.md
-        run: awk '/^## \[/{if(p)exit; p=1; next} p' CHANGELOG.md > /tmp/release-notes.md
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v hdr="## [$VERSION]" 'index($0, hdr) == 1 {p=1; next} p && /^## \[/ {exit} p' CHANGELOG.md > /tmp/release-notes.md
+          if ! grep -q '[^[:space:]]' /tmp/release-notes.md; then
+            echo "::error::No release notes for [$VERSION] in CHANGELOG.md"
+            exit 1
+          fi
       - uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser

@@ -3,3 +3,8 @@ build:
 
 lint:
 	golangci-lint run
+
+release:
+	@scripts/release.sh "$(V)"
+
+.PHONY: release
