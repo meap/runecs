@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -65,6 +66,10 @@ func describeTask(ctx context.Context, client *ecs.Client, taskArn *string) (Tas
 	return output, nil
 }
 
+func isMissing(failure types.Failure) bool {
+	return aws.ToString(failure.Reason) == "MISSING"
+}
+
 func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, task string) (bool, error) {
 	output, err := client.DescribeTasks(ctx, &ecs.DescribeTasksInput{
 		Cluster: &cluster,
@@ -73,6 +78,12 @@ func checkTaskStatus(ctx context.Context, cluster string, client *ecs.Client, ta
 
 	if err != nil {
 		return false, fmt.Errorf("failed to describe task: %w", err)
+	}
+
+	// The ECS API is eventually consistent: a task that RunTask just started
+	// may be reported as MISSING for a short while.
+	if slices.ContainsFunc(output.Failures, isMissing) {
+		return false, errTaskNotVisible
 	}
 
 	taskInfo, err := utils.SafeGetFirstPtr(output.Tasks, "no tasks found in response")
@@ -114,6 +125,17 @@ const logDeliveryGracePeriod = 5 * time.Second
 // taskStatusPollInterval is the cadence at which the task status is polled.
 const taskStatusPollInterval = 5 * time.Second
 
+// errTaskNotVisible means DescribeTasks does not return the task (yet).
+var errTaskNotVisible = errors.New("task not found by DescribeTasks")
+
+// taskVisibilityTimeout bounds how long a freshly started task may stay
+// invisible to DescribeTasks. Retries back off from
+// taskVisibilityInitialBackoff up to taskStatusPollInterval.
+const (
+	taskVisibilityTimeout        = 2 * time.Minute
+	taskVisibilityInitialBackoff = 1 * time.Second
+)
+
 // waitForTaskCompletion polls until the ECS task reaches STOPPED, then fetches
 // the task's complete log via FilterLogEvents. Live Tail is intentionally not
 // used here: it would miss events emitted before the tail session is
@@ -136,6 +158,12 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 	// caller can show the output that explains the failure.
 	var taskErr error
 
+	// Until DescribeTasks first returns the task, re-check the same ARN with
+	// a growing delay. A task that disappears after being seen is an error.
+	seen := false
+	visibilityDeadline := time.Now().Add(taskVisibilityTimeout)
+	backoff := taskVisibilityInitialBackoff
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -144,8 +172,20 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		}
 
 		stopped, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
-		if err != nil && !stopped {
+		delay := taskStatusPollInterval
+
+		switch {
+		case errors.Is(err, errTaskNotVisible) && !seen:
+			if time.Now().After(visibilityDeadline) {
+				return fmt.Errorf("task %s still not visible after %s: %w", taskArn, taskVisibilityTimeout, err)
+			}
+
+			delay = backoff
+			backoff = min(backoff*2, taskStatusPollInterval)
+		case err != nil && !stopped:
 			return err
+		default:
+			seen = true
 		}
 
 		if stopped {
@@ -158,7 +198,7 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("context cancelled while waiting for task completion: %w", ctx.Err())
-		case <-time.After(taskStatusPollInterval):
+		case <-time.After(delay):
 		}
 	}
 

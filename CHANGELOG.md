@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `run --wait` no longer fails when ECS does not yet return a task it has just started. ECS is eventually consistent, so `DescribeTasks` can briefly report the new task as missing; runecs now re-checks the same task with a growing delay (1 s up to 5 s) for up to 2 minutes before giving up. Previously it stopped waiting at once, while the task kept running.
+
 ## [0.11.1] - 2026-11-19
 
 ### Fixed
