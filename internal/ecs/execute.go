@@ -132,6 +132,10 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 
 	fmt.Println("Waiting for task to complete... Press CTRL+C to stop waiting (task will continue running).")
 
+	// A non-zero exit is returned only after the logs are fetched, so the
+	// caller can show the output that explains the failure.
+	var taskErr error
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -140,11 +144,12 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 		}
 
 		stopped, err := checkTaskStatus(ctx, cluster, clients.ECS, taskArn)
-		if err != nil {
+		if err != nil && !stopped {
 			return err
 		}
 
 		if stopped {
+			taskErr = err
 			result.Finished = true
 
 			break
@@ -168,12 +173,12 @@ func waitForTaskCompletion(ctx context.Context, clients *AWSClients, cluster str
 
 	logs, err := fetchTaskLogs(ctx, clients.CloudWatchLogs, tdef.LogGroup, logStreamName, startTimeMillis)
 	if err != nil {
-		return fmt.Errorf("failed to fetch task logs: %w", err)
+		return errors.Join(taskErr, fmt.Errorf("failed to fetch task logs: %w", err))
 	}
 
 	result.Logs = logs
 
-	return nil
+	return taskErr
 }
 
 func Execute(ctx context.Context, clients *AWSClients, cluster, service string, cmd []string, waitForCompletion bool, dockerImageTag string, cpuOverride, memoryOverride string) (*ExecuteResult, error) {

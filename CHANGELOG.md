@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- `run --wait` now prints the task's logs when the task exits with a non-zero code. Previously the output was dropped and only the exit code was reported, so a failed command (e.g. a database migration in CI) could not be diagnosed. runecs still exits with status 1.
 - macOS no longer blocks `runecs` installed via Homebrew with "Apple could not verify “runecs” is free of malware". The Homebrew cask now removes the quarantine flag after install.
 
 ## [0.11.0] - 2026-11-19
