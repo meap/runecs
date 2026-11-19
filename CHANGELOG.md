@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-19
+
 ### New
 - `restart` now accepts `--wait` (`-w`) to block until the new deployment of the service (or of every service with `--cluster`) has completed. Fails on rollout failure or circuit-breaker rollback, and times out after 30 minutes. Not supported with `--kill` (a warning is printed and the command does not wait).
 
@@ -30,4 +32,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `make lint` target.
 - Internal cleanup of prune defaults.
 
+[0.11.0]: https://github.com/meap/runecs/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/meap/runecs/compare/v0.9...v0.10.0
