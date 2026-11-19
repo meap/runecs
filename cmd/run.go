@@ -101,9 +101,11 @@ func runHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error parsing command arguments: %w", err)
 	}
 
-	result, err := ecs.Execute(ctx, clients, cluster, service, parsedArgs, execWait, dockerImageTag, cpuOverride, memoryOverride)
-	if err != nil {
-		return fmt.Errorf("failed to execute command: %w", err)
+	// Once the task has started, Execute returns the result together with any
+	// error (e.g. a non-zero exit), so the task's output is printed first.
+	result, execErr := ecs.Execute(ctx, clients, cluster, service, parsedArgs, execWait, dockerImageTag, cpuOverride, memoryOverride)
+	if result == nil {
+		return fmt.Errorf("failed to execute command: %w", execErr)
 	}
 
 	// Display task definition information
@@ -135,6 +137,10 @@ func runHandler(cmd *cobra.Command, args []string) error {
 		if result.Finished {
 			cmd.Printf("Task %s finished\n", result.TaskArn)
 		}
+	}
+
+	if execErr != nil {
+		return fmt.Errorf("failed to execute command: %w", execErr)
 	}
 
 	return nil
