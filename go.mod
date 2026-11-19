@@ -1,4 +1,4 @@
-module runecs.io/v1
+module github.com/meap/runecs
 
 go 1.26.0
 

@@ -21,7 +21,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/jinzhu/copier"
-	"runecs.io/v1/internal/utils"
+	"github.com/meap/runecs/internal/utils"
 )
 
 func cloneTaskDef(ctx context.Context, cluster, service, dockerImageTag string, svc *ecs.Client) (string, error) {

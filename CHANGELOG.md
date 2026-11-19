@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 - `restart` now accepts `--wait` (`-w`) to block until the new deployment of the service (or of every service with `--cluster`) has completed. Fails on rollout failure or circuit-breaker rollback, and times out after 30 minutes. Not supported with `--kill` (a warning is printed and the command does not wait).
 
+### Fixed
+- `go install github.com/meap/runecs@latest` now works. The Go module path changed from `runecs.io/v1` to `github.com/meap/runecs`. Releases before this one cannot be installed with `go install`; use the release binaries or Homebrew for those.
+
 ## [0.10.0] - 2026-04-19
 
 ### New

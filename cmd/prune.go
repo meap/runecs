@@ -8,8 +8,8 @@ import (
 	"syscall"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/meap/runecs/internal/ecs"
 	"github.com/spf13/cobra"
-	"runecs.io/v1/internal/ecs"
 )
 
 const (

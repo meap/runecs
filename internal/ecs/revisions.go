@@ -20,7 +20,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"runecs.io/v1/internal/utils"
+	"github.com/meap/runecs/internal/utils"
 )
 
 func getFamilies(ctx context.Context, familyPrefix string, svc *ecs.Client) ([]string, error) {
